@@ -1,7 +1,7 @@
 # Vibrater V2 - Project Status
 
-**Last Updated:** 2025-12-24
-**Phase:** 1 - Backend Setup ✅ COMPLETE
+**Last Updated:** 2025-12-26
+**Phase:** 4 - Frontend Updates (In Progress)
 
 ---
 
@@ -41,6 +41,43 @@
 - [x] Backend API documentation
 - [x] Kubernetes deployment guide
 - [x] Docker Compose guide
+
+### ✅ Phase 2: AI Integration (COMPLETE!)
+
+**AI Chat System:**
+- [x] Claude API provider integration
+- [x] OpenAI API provider integration
+- [x] AI chat endpoint with conversation management
+- [x] Idea refinement system with structured prompts
+- [x] Brainstorm chat - conversational AI sounding board
+- [x] Provider selection and configuration
+- [x] Cost tracking via usage metrics
+
+**AI-Powered Features:**
+- [x] Idea refinement conversations
+- [x] Design document generation
+- [x] Freeform brainstorming mode
+- [x] Question-based exploration
+
+### ✅ Phase 4: Frontend (Partial - In Progress)
+
+**React Frontend (Vite + Tailwind):**
+- [x] Authentication UI (login/register)
+- [x] JWT token management with refresh
+- [x] Ideas view with CRUD operations
+- [x] Projects view with task management
+- [x] Search and filtering (ideas by status/tags)
+- [x] Archive/tag management
+- [x] BrainstormChat component
+- [x] Voice input with Web Speech API
+- [x] Voice capture commands ("note that", etc.)
+- [x] Click-to-capture for messages/sentences
+- [x] Snippet sidebar with "Save as Idea"
+- [x] Inline title editing
+- [x] Promote ideas to projects
+- [ ] Text-to-speech playback (roadmap)
+- [ ] Offline support with IndexedDB
+- [ ] Streaming AI responses
 
 ### 📊 Current Statistics
 
@@ -193,21 +230,22 @@ vibrater/
 
 ## ⏳ What's Next (Roadmap)
 
-### Phase 2: AI Integration (2-3 weeks)
+### Phase 2: AI Integration ✅ COMPLETE
 
-**Goal:** Add AI-powered coding assistant
+**Completed:**
+- [x] Claude API provider
+- [x] OpenAI API provider
+- [x] AI chat endpoint
+- [x] Idea refinement system
+- [x] Brainstorm chat mode
+- [x] Cost tracking via usage metrics
 
-- [ ] Implement Claude API provider
-- [ ] Implement OpenAI API provider
-- [ ] Implement Ollama provider (local LLM)
-- [ ] Build AI chat endpoint with streaming
-- [ ] Implement code scaffolding
-- [ ] Add AI task suggestions
-- [ ] Create debug assistance
-- [ ] Add cost tracking per provider
-- [ ] Write specialized prompts
-
-**Deliverable:** Working AI chat that can generate code, scaffold projects, and help debug.
+**Still TODO (Phase 2.1 - Advanced AI):**
+- [ ] Ollama provider (local LLM)
+- [ ] Streaming AI responses
+- [ ] AI code scaffolding
+- [ ] AI task suggestions
+- [ ] Debug assistance
 
 ### Phase 3: Git Integration (2 weeks)
 
@@ -226,14 +264,19 @@ vibrater/
 
 **Goal:** Update PWA to use new backend
 
-- [ ] Add authentication UI (login/register)
-- [ ] Implement JWT token management
-- [ ] Build project list and detail views
-- [ ] Create task management UI
-- [ ] Add AI chat interface with streaming
+- [x] Add authentication UI (login/register)
+- [x] Implement JWT token management
+- [x] Build project list and detail views
+- [x] Create task management UI
+- [x] Add AI chat interface (brainstorm mode)
+- [x] Implement idea search and filtering
+- [x] Add archive/tagging functionality
+- [x] Voice input with capture commands
+- [ ] Add text-to-speech (TTS) playback for AI responses
 - [ ] Build code viewer component
 - [ ] Implement IndexedDB for offline caching
 - [ ] Create sync engine
+- [ ] Add AI chat streaming support
 - [ ] Migrate from localStorage to API
 
 **Deliverable:** Full-featured PWA connected to backend with offline support.
@@ -269,14 +312,23 @@ vibrater/
 
 ## 🔮 Future Enhancements (V2.1+)
 
-### V2.1: Collaboration
+### V2.1: Enhanced Voice Experience
+- **Text-to-Speech (TTS)** playback for AI responses
+  - Auto-play AI messages in brainstorm chat
+  - Speaker toggle button
+  - Voice-only conversations (hands-free)
+  - Natural browser voices
+- Voice commands for navigation
+- Adjustable speech rate and voice selection
+
+### V2.2: Collaboration
 - Share projects with team members
 - Assign tasks to users
 - Comments and discussions
 - Activity feed
 - Real-time collaboration
 
-### V2.2: Advanced Features
+### V2.3: Advanced Features
 - In-app code editor
 - Terminal access
 - Build and deploy automation
@@ -284,7 +336,7 @@ vibrater/
 - GitHub/GitLab OAuth
 - Issue tracking integration
 
-### V2.3: Analytics & Insights
+### V2.4: Analytics & Insights
 - Time tracking
 - Productivity metrics
 - AI usage analytics
