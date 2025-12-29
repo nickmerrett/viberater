@@ -1,0 +1,21 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#7c3aed" rx="80"/>
+
+  <!-- Lightning bolt (idea/energy) -->
+  <path d="M280 80 L180 280 L240 280 L200 432 L360 220 L300 220 Z"
+        fill="#fbbf24"
+        stroke="#fef3c7"
+        stroke-width="4"/>
+
+  <!-- Microphone wave -->
+  <circle cx="140" cy="380" r="8" fill="#f472b6"/>
+  <circle cx="180" cy="360" r="10" fill="#f472b6"/>
+  <circle cx="220" cy="340" r="12" fill="#f472b6"/>
+
+  <!-- Circuit connection lines -->
+  <path d="M340 360 L380 360 M360 340 L360 380"
+        stroke="#10b981"
+        stroke-width="6"
+        stroke-linecap="round"/>
+</svg>
