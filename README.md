@@ -13,6 +13,7 @@ Vibrater is a full-stack PWA that helps you capture, refine, and manage project 
 - 🔄 **Multi-Database** - Supports both SQLite (simple) and PostgreSQL (scalable)
 - 🐳 **Docker Ready** - One-command deployment
 - ☸️ **Kubernetes Ready** - Production-grade k8s configs included
+- 🔴 **OpenShift Ready** - Runs on OpenShift with Routes and strict security
 
 ## 🚀 Quick Start
 
@@ -55,11 +56,10 @@ npm run dev
 
 ## 📚 Documentation
 
-- **[Getting Started](GETTING_STARTED.md)** - Detailed setup guide
-- **[Architecture](ARCHITECTURE.md)** - System design and tech stack
-- **[Deployment](DEPLOYMENT.md)** - Production deployment guide
-- **[Database Guide](DATABASE.md)** - SQLite vs PostgreSQL configuration
-- **[API Reference](QUICK_REFERENCE.md)** - Backend API documentation
+- **[User Guide](GUIDE.md)** - Complete installation and API reference
+- **[Technical Documentation](DOCS.md)** - Architecture, database, and deployment
+- **[OpenShift Guide](k8s/OPENSHIFT.md)** - Deploy to OpenShift with Routes
+- **[Kubernetes Guide](k8s/README.md)** - Deploy to any Kubernetes cluster
 - **[Project Status](PROJECT_STATUS.md)** - Current features and roadmap
 
 ## 🗄️ Database Options

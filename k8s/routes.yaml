@@ -1,0 +1,37 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: vibrater-backend
+  namespace: vibrater
+  labels:
+    app: vibrater-backend
+spec:
+  to:
+    kind: Service
+    name: vibrater-backend-service
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: vibrater-frontend
+  namespace: vibrater
+  labels:
+    app: vibrater-frontend
+spec:
+  to:
+    kind: Service
+    name: vibrater-frontend-service
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None

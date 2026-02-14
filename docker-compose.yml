@@ -21,7 +21,7 @@ services:
       retries: 5
 
   backend:
-    build: ./vibrater-backend
+    build: ./backend
     container_name: vibrater_backend
     environment:
       NODE_ENV: ${NODE_ENV:-development}
@@ -45,7 +45,7 @@ services:
     command: npm run dev
 
   frontend:
-    build: ./vibrater
+    build: ./frontend
     container_name: vibrater_frontend
     expose:
       - "80"

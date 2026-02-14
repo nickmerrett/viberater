@@ -17,7 +17,7 @@ echo "  BUILD_ID: $BUILD_ID"
 echo "  BUILD_DATE: $BUILD_DATE"
 
 # Build frontend
-cd vibrater
+cd frontend 
 podman build \
   --build-arg BUILD_ID="$BUILD_ID" \
   --build-arg BUILD_DATE="$BUILD_DATE" \
@@ -25,7 +25,7 @@ podman build \
   .
 
 # Build backend
-cd ../vibrater-backend
+cd ../backend
 podman build -t vibrater-backend:latest .
 
 echo "Build complete!"

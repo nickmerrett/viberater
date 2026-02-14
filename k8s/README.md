@@ -2,6 +2,10 @@
 
 Deploy Vibrater to any Kubernetes cluster (local, cloud, or self-hosted).
 
+## 🔴 OpenShift Users
+
+**For OpenShift deployments, see [OPENSHIFT.md](OPENSHIFT.md)** for specific instructions on handling non-root containers, Routes, and security constraints.
+
 ## Database Options
 
 Vibrater supports both **SQLite** and **PostgreSQL**. Choose based on your needs:
