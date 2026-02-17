@@ -95,7 +95,7 @@ await fs.ensureDir('./logs');
 // Start server
 app.listen(PORT, () => {
   console.log('');
-  console.log('🎤 Vibrater Backend API');
+  console.log('🎤 viberater Backend API');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log(`✓ Server running on port ${PORT}`);
   console.log(`✓ Environment: ${process.env.NODE_ENV}`);

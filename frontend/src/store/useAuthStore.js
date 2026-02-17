@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import { api } from '../services/api';
 
 export const useAuthStore = create((set) => ({
-  user: JSON.parse(localStorage.getItem('vibrater_user') || 'null'),
-  isAuthenticated: !!localStorage.getItem('vibrater_access_token'),
+  user: JSON.parse(localStorage.getItem('viberater_user') || 'null'),
+  isAuthenticated: !!localStorage.getItem('viberater_access_token'),
   loading: false,
   error: null,
 
@@ -11,9 +11,9 @@ export const useAuthStore = create((set) => ({
     set({ loading: true, error: null });
     try {
       const data = await api.login(email, password);
-      localStorage.setItem('vibrater_access_token', data.accessToken);
-      localStorage.setItem('vibrater_refresh_token', data.refreshToken);
-      localStorage.setItem('vibrater_user', JSON.stringify(data.user));
+      localStorage.setItem('viberater_access_token', data.accessToken);
+      localStorage.setItem('viberater_refresh_token', data.refreshToken);
+      localStorage.setItem('viberater_user', JSON.stringify(data.user));
       set({ user: data.user, isAuthenticated: true, loading: false });
       return true;
     } catch (error) {
@@ -26,9 +26,9 @@ export const useAuthStore = create((set) => ({
     set({ loading: true, error: null });
     try {
       const data = await api.register(email, password, name);
-      localStorage.setItem('vibrater_access_token', data.accessToken);
-      localStorage.setItem('vibrater_refresh_token', data.refreshToken);
-      localStorage.setItem('vibrater_user', JSON.stringify(data.user));
+      localStorage.setItem('viberater_access_token', data.accessToken);
+      localStorage.setItem('viberater_refresh_token', data.refreshToken);
+      localStorage.setItem('viberater_user', JSON.stringify(data.user));
       set({ user: data.user, isAuthenticated: true, loading: false });
       return true;
     } catch (error) {
@@ -44,9 +44,9 @@ export const useAuthStore = create((set) => ({
       console.error('Logout API call failed:', error);
     } finally {
       // Clear state and storage regardless of API call success
-      localStorage.removeItem('vibrater_access_token');
-      localStorage.removeItem('vibrater_refresh_token');
-      localStorage.removeItem('vibrater_user');
+      localStorage.removeItem('viberater_access_token');
+      localStorage.removeItem('viberater_refresh_token');
+      localStorage.removeItem('viberater_user');
       set({ user: null, isAuthenticated: false });
     }
   },

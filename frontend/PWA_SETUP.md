@@ -1,6 +1,6 @@
 # PWA Setup Complete! 🎉
 
-Vibrater is now a full offline-first Progressive Web App.
+viberater is now a full offline-first Progressive Web App.
 
 ## ✅ What's Been Implemented
 
@@ -41,7 +41,7 @@ Vibrater is now a full offline-first Progressive Web App.
 
 ### 1. Install Dependencies
 ```bash
-cd /var/home/nmerrett/Documents/vibing/viberater/vibrater
+cd /var/home/nmerrett/Documents/vibing/viberater/viberater
 npm install -D vite-plugin-pwa
 ```
 
@@ -181,7 +181,7 @@ await db.clearAll();
 ```
 
 ### Sync Queue Stuck
-Check DevTools → Application → IndexedDB → vibrater-db → syncQueue
+Check DevTools → Application → IndexedDB → viberater-db → syncQueue
 
 Manually clear:
 ```js

@@ -1,4 +1,4 @@
-# Vibrater User Guide
+# viberater User Guide
 
 Complete guide for installation, usage, and API reference.
 
@@ -119,7 +119,7 @@ docker compose exec backend npm run migrate
 
 **Backend:**
 ```bash
-cd vibrater-backend
+cd viberater-backend
 
 # Install dependencies
 npm install
@@ -139,7 +139,7 @@ npm run dev
 
 **Frontend:**
 ```bash
-cd vibrater
+cd viberater
 
 # Install dependencies
 npm install
@@ -189,13 +189,13 @@ docker compose down -v
 
 ```bash
 # Backend development
-cd vibrater-backend
+cd viberater-backend
 npm run dev           # Start with hot reload
 npm run migrate       # Run database migrations
 npm test              # Run tests
 
 # Frontend development
-cd vibrater
+cd viberater
 npm run dev           # Start dev server
 npm run build         # Build for production
 npm run preview       # Preview production build
@@ -206,10 +206,10 @@ npm run preview       # Preview production build
 **SQLite:**
 ```bash
 # Backup
-cp vibrater-backend/storage/vibrater.db backups/vibrater-$(date +%Y%m%d).db
+cp viberater-backend/storage/viberater.db backups/viberater-$(date +%Y%m%d).db
 
 # View database
-sqlite3 vibrater-backend/storage/vibrater.db
+sqlite3 viberater-backend/storage/viberater.db
 .tables
 .schema ideas
 SELECT * FROM ideas LIMIT 10;
@@ -219,16 +219,16 @@ SELECT * FROM ideas LIMIT 10;
 **PostgreSQL:**
 ```bash
 # Access database
-docker compose exec postgres psql -U vibrater -d vibrater
+docker compose exec postgres psql -U viberater -d viberater
 
 # Backup
-docker compose exec postgres pg_dump -U vibrater vibrater > backup.sql
+docker compose exec postgres pg_dump -U viberater viberater > backup.sql
 
 # Restore
-docker compose exec -i postgres psql -U vibrater vibrater < backup.sql
+docker compose exec -i postgres psql -U viberater viberater < backup.sql
 
 # Common queries
-docker compose exec postgres psql -U vibrater -d vibrater -c "SELECT COUNT(*) FROM ideas;"
+docker compose exec postgres psql -U viberater -d viberater -c "SELECT COUNT(*) FROM ideas;"
 ```
 
 ### Kubernetes
@@ -243,22 +243,22 @@ kubectl apply -f k8s/frontend-deployment.yaml
 kubectl apply -f k8s/ingress.yaml
 
 # View status
-kubectl get pods -n vibrater
-kubectl get svc -n vibrater
-kubectl get ingress -n vibrater
+kubectl get pods -n viberater
+kubectl get svc -n viberater
+kubectl get ingress -n viberater
 
 # View logs
-kubectl logs -f deployment/vibrater-backend -n vibrater
-kubectl logs -f deployment/vibrater-frontend -n vibrater
+kubectl logs -f deployment/viberater-backend -n viberater
+kubectl logs -f deployment/viberater-frontend -n viberater
 
 # Restart services
-kubectl rollout restart deployment/vibrater-backend -n vibrater
+kubectl rollout restart deployment/viberater-backend -n viberater
 
 # Port forwarding for testing
-kubectl port-forward svc/vibrater-backend-service 3000:80 -n vibrater
+kubectl port-forward svc/viberater-backend-service 3000:80 -n viberater
 
 # Delete everything
-kubectl delete namespace vibrater
+kubectl delete namespace viberater
 ```
 
 ---
@@ -626,5 +626,5 @@ docker compose exec backend npm run migrate:pg-to-sqlite
 - [Technical Documentation](DOCS.md) - Architecture, database, deployment
 - [Project Status](PROJECT_STATUS.md) - Features and roadmap
 - [Kubernetes Guide](k8s/README.md) - K8s deployment details
-- [PWA Details](vibrater/PWA_SETUP.md) - Offline functionality
+- [PWA Details](viberater/PWA_SETUP.md) - Offline functionality
 

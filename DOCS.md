@@ -1,4 +1,4 @@
-# Vibrater Documentation
+# viberater Documentation
 
 Complete technical documentation for architecture, database, and deployment.
 
@@ -15,7 +15,7 @@ Complete technical documentation for architecture, database, and deployment.
 
 ### System Overview
 
-Vibrater is a full-stack Progressive Web App for capturing and managing project ideas with AI assistance.
+viberater is a full-stack Progressive Web App for capturing and managing project ideas with AI assistance.
 
 **Tech Stack:**
 
@@ -41,7 +41,7 @@ Vibrater is a full-stack Progressive Web App for capturing and managing project 
 
 ```
 ┌────────────────────────────────────────────────────────┐
-│                  Vibrater PWA                          │
+│                  viberater PWA                          │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
 │  │ Idea Capture │  │   Projects   │  │  AI Chat     │ │
 │  │   (Voice)    │  │   & Tasks    │  │  Refinement  │ │
@@ -49,7 +49,7 @@ Vibrater is a full-stack Progressive Web App for capturing and managing project 
 └─────────────────────────┬──────────────────────────────┘
                           │ REST API
 ┌─────────────────────────▼──────────────────────────────┐
-│               Vibrater Backend API                     │
+│               viberater Backend API                     │
 │                 (Node.js + Express)                    │
 │  ┌──────────────────────────────────────────────────┐ │
 │  │  JWT Auth + Rate Limiting                        │ │
@@ -92,7 +92,7 @@ Vibrater is a full-stack Progressive Web App for capturing and managing project 
 
 ## Database Configuration
 
-Vibrater supports both **SQLite** and **PostgreSQL**. Choose based on your deployment needs.
+viberater supports both **SQLite** and **PostgreSQL**. Choose based on your deployment needs.
 
 ### Quick Comparison
 
@@ -126,15 +126,15 @@ SQLITE_DIR=./storage
 - ⚠️ Not ideal for high-traffic production
 
 **Location:**
-Database stored at `vibrater-backend/storage/vibrater.db`
+Database stored at `viberater-backend/storage/viberater.db`
 
 **Backup:**
 ```bash
 # Simple file copy
-cp vibrater-backend/storage/vibrater.db backups/vibrater-$(date +%Y%m%d).db
+cp viberater-backend/storage/viberater.db backups/viberater-$(date +%Y%m%d).db
 
 # Or with SQLite tools
-sqlite3 storage/vibrater.db ".backup backups/vibrater.db"
+sqlite3 storage/viberater.db ".backup backups/viberater.db"
 ```
 
 ### PostgreSQL Configuration
@@ -144,7 +144,7 @@ sqlite3 storage/vibrater.db ".backup backups/vibrater.db"
 ```bash
 # .env
 DB_TYPE=postgres
-DATABASE_URL=postgresql://user:password@localhost:5432/vibrater
+DATABASE_URL=postgresql://user:password@localhost:5432/viberater
 ```
 
 **Benefits:**
@@ -160,13 +160,13 @@ DATABASE_URL=postgresql://user:password@localhost:5432/vibrater
 **Backup:**
 ```bash
 # Dump entire database
-docker compose exec postgres pg_dump -U vibrater vibrater > backup.sql
+docker compose exec postgres pg_dump -U viberater viberater > backup.sql
 
 # Compressed format
-docker compose exec postgres pg_dump -U vibrater -Fc vibrater > backup.dump
+docker compose exec postgres pg_dump -U viberater -Fc viberater > backup.dump
 
 # Restore
-docker compose exec -i postgres psql -U vibrater vibrater < backup.sql
+docker compose exec -i postgres psql -U viberater viberater < backup.sql
 ```
 
 ### Database Schema
@@ -401,7 +401,7 @@ docker compose logs -f backend
 docker compose logs -f frontend
 
 # Kubernetes
-kubectl logs -f deployment/vibrater-backend -n vibrater
+kubectl logs -f deployment/viberater-backend -n viberater
 ```
 
 ### Scaling
@@ -418,7 +418,7 @@ kubectl logs -f deployment/vibrater-backend -n vibrater
 
 ```yaml
 # Scale backend replicas
-kubectl scale deployment vibrater-backend --replicas=3 -n vibrater
+kubectl scale deployment viberater-backend --replicas=3 -n viberater
 ```
 
 ---
@@ -439,5 +439,5 @@ See [GUIDE.md](GUIDE.md) for complete API documentation including:
 
 - [Getting Started Guide](GUIDE.md)
 - [Kubernetes Documentation](k8s/README.md)
-- [PWA Setup Details](vibrater/PWA_SETUP.md)
+- [PWA Setup Details](viberater/PWA_SETUP.md)
 - [Project Status & Roadmap](PROJECT_STATUS.md)

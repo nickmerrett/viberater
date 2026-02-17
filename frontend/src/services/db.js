@@ -1,6 +1,6 @@
 // IndexedDB wrapper for offline storage
 
-const DB_NAME = 'vibrater-db';
+const DB_NAME = 'viberater-db';
 const DB_VERSION = 1;
 
 const STORES = {

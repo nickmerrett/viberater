@@ -1,28 +1,38 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: vibrater-frontend
-  namespace: vibrater
+  name: viberater-frontend
+  namespace: viberater
   labels:
-    app: vibrater-frontend
+    app: viberater-frontend
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: vibrater-frontend
+      app: viberater-frontend
   template:
     metadata:
       labels:
-        app: vibrater-frontend
+        app: viberater-frontend
     spec:
+      # OpenShift security context
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: frontend
-        image: ghcr.io/yourusername/vibrater-frontend:latest
-        # For development, you might use:
-        # image: vibrater-frontend:dev
+        image: 10.10.20.6:5000/nmerrett/viberater-frontend:latest
+        # For OpenShift, build with: docker build -f Dockerfile.openshift -t viberater-frontend:openshift .
         ports:
-        - containerPort: 80
+        - containerPort: 8080
           name: http
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
         resources:
           requests:
             memory: "64Mi"
@@ -33,7 +43,7 @@ spec:
         livenessProbe:
           httpGet:
             path: /
-            port: 80
+            port: 8080
           initialDelaySeconds: 10
           periodSeconds: 10
           timeoutSeconds: 5
@@ -41,7 +51,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /
-            port: 80
+            port: 8080
           initialDelaySeconds: 5
           periodSeconds: 5
           timeoutSeconds: 3
@@ -50,16 +60,16 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: vibrater-frontend-service
-  namespace: vibrater
+  name: viberater-frontend-service
+  namespace: viberater
   labels:
-    app: vibrater-frontend
+    app: viberater-frontend
 spec:
   type: ClusterIP
   ports:
-  - port: 80
-    targetPort: 80
+  - port: 8080
+    targetPort: 8080
     protocol: TCP
     name: http
   selector:
-    app: vibrater-frontend
+    app: viberater-frontend

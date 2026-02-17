@@ -45,7 +45,7 @@ export default function PWAInstallPrompt() {
         <div className="flex items-start gap-4">
           <div className="text-4xl">📱</div>
           <div className="flex-1">
-            <h3 className="font-bold text-lg mb-2">Install Vibrater</h3>
+            <h3 className="font-bold text-lg mb-2">Install viberater</h3>
             <p className="text-sm text-gray-300 mb-4">
               Install this app on your device for a better experience and offline access!
             </p>

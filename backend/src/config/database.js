@@ -37,7 +37,7 @@ if (DB_TYPE === 'postgres') {
 
   // Create database directory if it doesn't exist
   const dbDir = process.env.SQLITE_DIR || join(__dirname, '../../storage');
-  const dbPath = join(dbDir, 'vibrater.db');
+  const dbPath = join(dbDir, 'viberater.db');
 
   fs.ensureDirSync(dbDir);
 

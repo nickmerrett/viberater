@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg'],
       manifest: {
-        name: 'Vibrater - Idea to Execution',
-        short_name: 'Vibrater',
+        name: 'viberater - Idea to Execution',
+        short_name: 'viberater',
         description: 'Capture ideas, refine with AI, and turn them into projects',
         theme_color: '#7c3aed',
         background_color: '#030712',

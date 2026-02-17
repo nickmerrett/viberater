@@ -21,13 +21,13 @@ cd frontend
 podman build \
   --build-arg BUILD_ID="$BUILD_ID" \
   --build-arg BUILD_DATE="$BUILD_DATE" \
-  -t vibrater-frontend:latest \
+  -t viberater-frontend:latest \
   .
 
 # Build backend
 cd ../backend
-podman build -t vibrater-backend:latest .
+podman build -t viberater-backend:latest .
 
 echo "Build complete!"
-echo "Frontend: vibrater-frontend:latest ($BUILD_ID)"
-echo "Backend: vibrater-backend:latest"
+echo "Frontend: viberater-frontend:latest ($BUILD_ID)"
+echo "Backend: viberater-backend:latest"

@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: vibrater
+namespace: viberater
 
 resources:
   - namespace.yaml
@@ -10,11 +10,11 @@ resources:
   - postgres-deployment.yaml
   - backend-deployment.yaml
   - frontend-deployment.yaml
-  - ingress.yaml
+  - routes.yaml
 
 # Note: Create secrets separately with kubectl create secret
 # or use sealed-secrets/external-secrets in production
 
 commonLabels:
-  app.kubernetes.io/name: vibrater
+  app.kubernetes.io/name: viberater
   app.kubernetes.io/version: "2.0"

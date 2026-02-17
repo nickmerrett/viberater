@@ -1,8 +1,8 @@
-# Vibrater 🎤✨
+# viberater 🎤✨
 
 **Voice-driven idea capture and project management for developers**
 
-Vibrater is a full-stack PWA that helps you capture, refine, and manage project ideas through natural conversation and AI-powered workflows. Think of it as your creative development partner that helps you go from "I have an idea" to "I shipped a project."
+viberater is a full-stack PWA that helps you capture, refine, and manage project ideas through natural conversation and AI-powered workflows. Think of it as your creative development partner that helps you go from "I have an idea" to "I shipped a project."
 
 ## ✨ Features
 
@@ -41,13 +41,13 @@ docker compose up
 
 ```bash
 # Backend
-cd vibrater-backend
+cd viberater-backend
 npm install
 npm run migrate
 npm run dev
 
 # Frontend (separate terminal)
-cd vibrater
+cd viberater
 npm install
 npm run dev
 
@@ -64,7 +64,7 @@ npm run dev
 
 ## 🗄️ Database Options
 
-Vibrater supports both SQLite and PostgreSQL:
+viberater supports both SQLite and PostgreSQL:
 
 **SQLite (Default)**
 - ✅ Zero configuration
@@ -116,7 +116,7 @@ Create a `.env` file in the root directory:
 ```bash
 # Database
 DB_TYPE=sqlite
-SQLITE_DIR=./vibrater-backend/storage
+SQLITE_DIR=./viberater-backend/storage
 
 # AI Providers
 CLAUDE_API_KEY=sk-ant-your-key-here

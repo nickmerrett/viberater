@@ -1,17 +1,17 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: vibrater-config
-  namespace: vibrater
+  name: viberater-config
+  namespace: viberater
 data:
   NODE_ENV: "production"
   DATABASE_HOST: "postgres-service"
   DATABASE_PORT: "5432"
-  DATABASE_NAME: "vibrater"
-  DATABASE_USER: "vibrater"
-  CORS_ORIGIN: "https://vibrater.yourdomain.com"
+  DATABASE_NAME: "viberater"
+  DATABASE_USER: "viberater"
+  CORS_ORIGIN: "https://viberater.apps.homeserv.merrett.lan"
   DEFAULT_AI_PROVIDER: "claude"
-  MODEL_PRIMARY: "claude-3-5-sonnet-20240620"
+  MODEL_PRIMARY: "claude-4-5-sonnet-20240620"
   RATE_LIMIT_WINDOW_MS: "900000"
   RATE_LIMIT_MAX_REQUESTS: "100"
   JWT_ACCESS_EXPIRY: "15m"

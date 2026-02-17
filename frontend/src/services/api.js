@@ -16,7 +16,7 @@ class APIClient {
   }
 
   getAuthHeader() {
-    const token = localStorage.getItem('vibrater_access_token');
+    const token = localStorage.getItem('viberater_access_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   }
 
@@ -92,7 +92,7 @@ class APIClient {
   }
 
   async refreshToken() {
-    const refreshToken = localStorage.getItem('vibrater_refresh_token');
+    const refreshToken = localStorage.getItem('viberater_refresh_token');
     if (!refreshToken) return false;
 
     try {
@@ -105,7 +105,7 @@ class APIClient {
       if (!response.ok) return false;
 
       const data = await response.json();
-      localStorage.setItem('vibrater_access_token', data.accessToken);
+      localStorage.setItem('viberater_access_token', data.accessToken);
       return true;
     } catch (error) {
       return false;
@@ -128,16 +128,16 @@ class APIClient {
   }
 
   async logout() {
-    const refreshToken = localStorage.getItem('vibrater_refresh_token');
+    const refreshToken = localStorage.getItem('viberater_refresh_token');
     if (refreshToken) {
       await this.request('/auth/logout', {
         method: 'POST',
         body: JSON.stringify({ refreshToken }),
       });
     }
-    localStorage.removeItem('vibrater_access_token');
-    localStorage.removeItem('vibrater_refresh_token');
-    localStorage.removeItem('vibrater_user');
+    localStorage.removeItem('viberater_access_token');
+    localStorage.removeItem('viberater_refresh_token');
+    localStorage.removeItem('viberater_user');
   }
 
   // Ideas endpoints

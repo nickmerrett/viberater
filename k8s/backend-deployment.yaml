@@ -1,76 +1,54 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: vibrater-backend
-  namespace: vibrater
+  name: viberater-backend
+  namespace: viberater
   labels:
-    app: vibrater-backend
-  annotations:
-    description: "Backend deployment using PostgreSQL database"
+    app: viberater-backend
 spec:
-  replicas: 2  # Multiple replicas supported with PostgreSQL
+  # SQLite only supports single writer, so use 1 replica
+  replicas: 1
+  strategy:
+    type: Recreate  # Ensure only one pod at a time
   selector:
     matchLabels:
-      app: vibrater-backend
+      app: viberater-backend
   template:
     metadata:
       labels:
-        app: vibrater-backend
+        app: viberater-backend
     spec:
-      initContainers:
-      # Wait for PostgreSQL to be ready
-      - name: wait-for-postgres
-        image: busybox:1.36
-        command:
-        - sh
-        - -c
-        - |
-          until nc -z postgres-service 5432; do
-            echo "Waiting for postgres...";
-            sleep 2;
-          done;
-          echo "PostgreSQL is ready!";
+      # OpenShift security context
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
 
+      initContainers:
       # Run database migrations
       - name: run-migrations
-        image: ghcr.io/yourusername/vibrater-backend:latest
+        image: 10.10.20.6:5000/nmerrett/viberater-backend:latest
+        # For OpenShift, build with: docker build -f Dockerfile.openshift -t viberater-backend:openshift .
         command: ["npm", "run", "migrate"]
         env:
         - name: DB_TYPE
-          value: "postgres"
-        - name: DATABASE_URL
-          value: "postgresql://$(DATABASE_USER):$(DATABASE_PASSWORD)@$(DATABASE_HOST):$(DATABASE_PORT)/$(DATABASE_NAME)"
-        - name: DATABASE_HOST
-          valueFrom:
-            configMapKeyRef:
-              name: vibrater-config
-              key: DATABASE_HOST
-        - name: DATABASE_PORT
-          valueFrom:
-            configMapKeyRef:
-              name: vibrater-config
-              key: DATABASE_PORT
-        - name: DATABASE_NAME
-          valueFrom:
-            configMapKeyRef:
-              name: vibrater-config
-              key: DATABASE_NAME
-        - name: DATABASE_USER
-          valueFrom:
-            configMapKeyRef:
-              name: vibrater-config
-              key: DATABASE_USER
-        - name: DATABASE_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: vibrater-secrets
-              key: DATABASE_PASSWORD
+          value: "sqlite"
+        - name: SQLITE_DIR
+          value: "/app/storage"
+        volumeMounts:
+        - name: storage
+          mountPath: /app/storage
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
 
       containers:
       - name: backend
-        image: ghcr.io/yourusername/vibrater-backend:latest
-        # For development, you might use:
-        # image: vibrater-backend:dev
+        image: 10.10.20.6:5000/nmerrett/viberater-backend:latest
+        # For OpenShift, build with: docker build -f Dockerfile.openshift -t viberater-backend:openshift .
         ports:
         - containerPort: 3000
           name: http
@@ -78,102 +56,96 @@ spec:
         - name: NODE_ENV
           valueFrom:
             configMapKeyRef:
-              name: vibrater-config
+              name: viberater-config
               key: NODE_ENV
         - name: PORT
           value: "3000"
+
+        # Database Configuration - SQLite
         - name: DB_TYPE
-          value: "postgres"
-        - name: DATABASE_URL
-          value: "postgresql://$(DATABASE_USER):$(DATABASE_PASSWORD)@$(DATABASE_HOST):$(DATABASE_PORT)/$(DATABASE_NAME)"
-        - name: DATABASE_HOST
-          valueFrom:
-            configMapKeyRef:
-              name: vibrater-config
-              key: DATABASE_HOST
-        - name: DATABASE_PORT
-          valueFrom:
-            configMapKeyRef:
-              name: vibrater-config
-              key: DATABASE_PORT
-        - name: DATABASE_NAME
-          valueFrom:
-            configMapKeyRef:
-              name: vibrater-config
-              key: DATABASE_NAME
-        - name: DATABASE_USER
-          valueFrom:
-            configMapKeyRef:
-              name: vibrater-config
-              key: DATABASE_USER
-        - name: DATABASE_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: vibrater-secrets
-              key: DATABASE_PASSWORD
+          value: "sqlite"
+        - name: SQLITE_DIR
+          value: "/app/storage"
+
+        # JWT Configuration
         - name: JWT_SECRET
           valueFrom:
             secretKeyRef:
-              name: vibrater-secrets
+              name: viberater-secrets
               key: JWT_SECRET
         - name: JWT_ACCESS_EXPIRY
           valueFrom:
             configMapKeyRef:
-              name: vibrater-config
+              name: viberater-config
               key: JWT_ACCESS_EXPIRY
         - name: JWT_REFRESH_EXPIRY
           valueFrom:
             configMapKeyRef:
-              name: vibrater-config
+              name: viberater-config
               key: JWT_REFRESH_EXPIRY
+
+        # CORS Configuration
         - name: CORS_ORIGIN
           valueFrom:
             configMapKeyRef:
-              name: vibrater-config
+              name: viberater-config
               key: CORS_ORIGIN
+
+        # AI Configuration
         - name: DEFAULT_AI_PROVIDER
           valueFrom:
             configMapKeyRef:
-              name: vibrater-config
+              name: viberater-config
               key: DEFAULT_AI_PROVIDER
         - name: MODEL_PRIMARY
           valueFrom:
             configMapKeyRef:
-              name: vibrater-config
+              name: viberater-config
               key: MODEL_PRIMARY
         - name: CLAUDE_API_KEY
           valueFrom:
             secretKeyRef:
-              name: vibrater-secrets
+              name: viberater-secrets
               key: CLAUDE_API_KEY
               optional: true
         - name: OPENAI_API_KEY
           valueFrom:
             secretKeyRef:
-              name: vibrater-secrets
+              name: viberater-secrets
               key: OPENAI_API_KEY
               optional: true
         - name: OLLAMA_BASE_URL
           valueFrom:
             secretKeyRef:
-              name: vibrater-secrets
+              name: viberater-secrets
               key: OLLAMA_BASE_URL
               optional: true
+
+        # Rate Limiting
         - name: RATE_LIMIT_WINDOW_MS
           valueFrom:
             configMapKeyRef:
-              name: vibrater-config
+              name: viberater-config
               key: RATE_LIMIT_WINDOW_MS
         - name: RATE_LIMIT_MAX_REQUESTS
           valueFrom:
             configMapKeyRef:
-              name: vibrater-config
+              name: viberater-config
               key: RATE_LIMIT_MAX_REQUESTS
+
         volumeMounts:
         - name: storage
           mountPath: /app/storage
         - name: logs
           mountPath: /app/logs
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+
         resources:
           requests:
             memory: "256Mi"
@@ -181,6 +153,7 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
+
         livenessProbe:
           httpGet:
             path: /health
@@ -189,6 +162,7 @@ spec:
           periodSeconds: 10
           timeoutSeconds: 5
           failureThreshold: 3
+
         readinessProbe:
           httpGet:
             path: /health
@@ -209,10 +183,10 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: backend-storage-pvc
-  namespace: vibrater
+  namespace: viberater
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce  # SQLite requires single writer
   resources:
     requests:
       storage: 5Gi
@@ -220,10 +194,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: vibrater-backend-service
-  namespace: vibrater
+  name: viberater-backend-service
+  namespace: viberater
   labels:
-    app: vibrater-backend
+    app: viberater-backend
 spec:
   type: ClusterIP
   ports:
@@ -232,4 +206,4 @@ spec:
     protocol: TCP
     name: http
   selector:
-    app: vibrater-backend
+    app: viberater-backend

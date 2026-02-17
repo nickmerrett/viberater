@@ -3,31 +3,31 @@ version: '3.8'
 services:
   postgres:
     image: docker.io/postgres:15-alpine
-    container_name: vibrater_postgres
+    container_name: viberater_postgres
     profiles: ["postgres"]  # Optional - only start with --profile postgres
     environment:
-      POSTGRES_USER: vibrater
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-vibrater_dev_password}
-      POSTGRES_DB: vibrater
+      POSTGRES_USER: viberater
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-viberater_dev_password}
+      POSTGRES_DB: viberater
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U vibrater"]
+      test: ["CMD-SHELL", "pg_isready -U viberater"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   backend:
     build: ./backend
-    container_name: vibrater_backend
+    container_name: viberater_backend
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       DB_TYPE: ${DB_TYPE:-sqlite}
       SQLITE_DIR: /app/storage
-      DATABASE_URL: postgresql://vibrater:${DB_PASSWORD:-vibrater_dev_password}@postgres:5432/vibrater
+      DATABASE_URL: postgresql://viberater:${DB_PASSWORD:-viberater_dev_password}@postgres:5432/viberater
       JWT_SECRET: ${JWT_SECRET:-dev-secret-key-change-in-production-min-32-chars}
       CLAUDE_API_KEY: ${CLAUDE_API_KEY}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
@@ -36,9 +36,9 @@ services:
       MODEL_PRIMARY: ${MODEL_PRIMARY:-claude-3-5-sonnet-20240620}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
     volumes:
-      - ./vibrater-backend/src:/app/src:Z
-      - ./vibrater-backend/storage:/app/storage:Z
-      - ./vibrater-backend/logs:/app/logs:Z
+      - ./viberater-backend/src:/app/src:Z
+      - ./viberater-backend/storage:/app/storage:Z
+      - ./viberater-backend/logs:/app/logs:Z
     expose:
       - "3000"
     restart: unless-stopped
@@ -46,14 +46,14 @@ services:
 
   frontend:
     build: ./frontend
-    container_name: vibrater_frontend
+    container_name: viberater_frontend
     expose:
       - "80"
     restart: unless-stopped
 
   nginx:
     image: docker.io/nginx:alpine
-    container_name: vibrater_nginx
+    container_name: viberater_nginx
     ports:
       - "8080:80"
     volumes:

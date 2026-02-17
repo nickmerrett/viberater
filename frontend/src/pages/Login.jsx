@@ -57,7 +57,7 @@ export default function Login() {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-6xl font-bold mb-3 bg-gradient-accent bg-clip-text text-transparent">
-            Vibrater
+            viberater
           </h1>
           <p className="text-gray-400 text-lg">Idea to Execution, Simplified</p>
         </div>

@@ -1,6 +1,6 @@
 # OpenShift Deployment Guide
 
-This guide covers deploying Vibrater on OpenShift with the security constraints required for non-root containers.
+This guide covers deploying viberater on OpenShift with the security constraints required for non-root containers.
 
 ## Key Differences from Standard Kubernetes
 
@@ -22,16 +22,16 @@ OpenShift enforces stricter security policies:
 
 ```bash
 # Backend
-cd vibrater-backend
-docker build -f Dockerfile.openshift -t vibrater-backend:openshift .
-docker tag vibrater-backend:openshift <your-registry>/vibrater-backend:openshift
-docker push <your-registry>/vibrater-backend:openshift
+cd viberater-backend
+docker build -f Dockerfile.openshift -t viberater-backend:openshift .
+docker tag viberater-backend:openshift <your-registry>/viberater-backend:openshift
+docker push <your-registry>/viberater-backend:openshift
 
 # Frontend
-cd ../vibrater
-docker build -f Dockerfile.openshift -t vibrater-frontend:openshift .
-docker tag vibrater-frontend:openshift <your-registry>/vibrater-frontend:openshift
-docker push <your-registry>/vibrater-frontend:openshift
+cd ../viberater
+docker build -f Dockerfile.openshift -t viberater-frontend:openshift .
+docker tag viberater-frontend:openshift <your-registry>/viberater-frontend:openshift
+docker push <your-registry>/viberater-frontend:openshift
 ```
 
 **Using OpenShift internal registry:**
@@ -46,18 +46,18 @@ REGISTRY=$(oc get route default-route -n openshift-image-registry -o jsonpath='{
 docker login -u $(oc whoami) -p $(oc whoami -t) $REGISTRY
 
 # Build and push
-docker build -f Dockerfile.openshift -t $REGISTRY/vibrater/vibrater-backend:latest .
-docker push $REGISTRY/vibrater/vibrater-backend:latest
+docker build -f Dockerfile.openshift -t $REGISTRY/viberater/viberater-backend:latest .
+docker push $REGISTRY/viberater/viberater-backend:latest
 
-docker build -f Dockerfile.openshift -t $REGISTRY/vibrater/vibrater-frontend:latest .
-docker push $REGISTRY/vibrater/vibrater-frontend:latest
+docker build -f Dockerfile.openshift -t $REGISTRY/viberater/viberater-frontend:latest .
+docker push $REGISTRY/viberater/viberater-frontend:latest
 ```
 
 ### 2. Create Namespace
 
 ```bash
 oc apply -f k8s/namespace.yaml
-oc project vibrater
+oc project viberater
 ```
 
 ### 3. Configure Secrets and ConfigMaps
@@ -89,8 +89,8 @@ oc apply -f k8s/backend-deployment-openshift.yaml
 
 **Check status:**
 ```bash
-oc get pods -n vibrater
-oc logs -f deployment/vibrater-backend -n vibrater
+oc get pods -n viberater
+oc logs -f deployment/viberater-backend -n viberater
 ```
 
 ### 5. Deploy Frontend
@@ -103,12 +103,12 @@ oc apply -f k8s/frontend-deployment-openshift.yaml
 
 **Backend Route:**
 ```bash
-oc expose service vibrater-backend-service --name=vibrater-backend
+oc expose service viberater-backend-service --name=viberater-backend
 ```
 
 **Frontend Route:**
 ```bash
-oc expose service vibrater-frontend-service --name=vibrater-frontend
+oc expose service viberater-frontend-service --name=viberater-frontend
 ```
 
 **Get URLs:**
@@ -119,20 +119,20 @@ oc get routes
 You should see:
 ```
 NAME                 HOST/PORT                                    PATH   SERVICES                      PORT   TERMINATION   WILDCARD
-vibrater-backend     vibrater-backend-vibrater.apps.example.com          vibrater-backend-service      http                 None
-vibrater-frontend    vibrater-frontend-vibrater.apps.example.com         vibrater-frontend-service     http                 None
+viberater-backend     viberater-backend-viberater.apps.example.com          viberater-backend-service      http                 None
+viberater-frontend    viberater-frontend-viberater.apps.example.com         viberater-frontend-service     http                 None
 ```
 
 ### 7. Enable HTTPS (Optional but Recommended)
 
 **Secure routes with edge termination:**
 ```bash
-oc create route edge vibrater-backend-secure \
-  --service=vibrater-backend-service \
+oc create route edge viberater-backend-secure \
+  --service=viberater-backend-service \
   --port=http
 
-oc create route edge vibrater-frontend-secure \
-  --service=vibrater-frontend-service \
+oc create route edge viberater-frontend-secure \
+  --service=viberater-frontend-service \
   --port=http
 ```
 
@@ -145,26 +145,26 @@ oc apply -f k8s/routes.yaml
 
 Update the ConfigMap with your frontend route URL:
 ```bash
-oc edit configmap vibrater-config -n vibrater
+oc edit configmap viberater-config -n viberater
 ```
 
 Change `CORS_ORIGIN` to your frontend route:
 ```yaml
 data:
-  CORS_ORIGIN: https://vibrater-frontend-vibrater.apps.example.com
+  CORS_ORIGIN: https://viberater-frontend-viberater.apps.example.com
 ```
 
 Restart backend to pick up changes:
 ```bash
-oc rollout restart deployment/vibrater-backend -n vibrater
+oc rollout restart deployment/viberater-backend -n viberater
 ```
 
 ## Configuration Files
 
 **OpenShift-specific files:**
-- `vibrater-backend/Dockerfile.openshift` - Non-root backend image
-- `vibrater/Dockerfile.openshift` - Non-root frontend image with nginx on port 8080
-- `vibrater/nginx-openshift.conf` - Nginx config with temp paths in /tmp
+- `viberater-backend/Dockerfile.openshift` - Non-root backend image
+- `viberater/Dockerfile.openshift` - Non-root frontend image with nginx on port 8080
+- `viberater/nginx-openshift.conf` - Nginx config with temp paths in /tmp
 - `k8s/backend-deployment-openshift.yaml` - Backend deployment with security contexts
 - `k8s/frontend-deployment-openshift.yaml` - Frontend deployment with security contexts
 - `k8s/routes.yaml` - OpenShift Route definitions
@@ -180,7 +180,7 @@ spec:
     spec:
       containers:
       - name: backend
-        image: <your-registry>/vibrater-backend:openshift
+        image: <your-registry>/viberater-backend:openshift
 ```
 
 **Frontend deployment:**
@@ -190,35 +190,35 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: <your-registry>/vibrater-frontend:openshift
+        image: <your-registry>/viberater-frontend:openshift
 ```
 
 ## Common Commands
 
 ```bash
 # View all resources
-oc get all -n vibrater
+oc get all -n viberater
 
 # View logs
-oc logs -f deployment/vibrater-backend -n vibrater
-oc logs -f deployment/vibrater-frontend -n vibrater
+oc logs -f deployment/viberater-backend -n viberater
+oc logs -f deployment/viberater-frontend -n viberater
 
 # Restart deployments
-oc rollout restart deployment/vibrater-backend -n vibrater
-oc rollout restart deployment/vibrater-frontend -n vibrater
+oc rollout restart deployment/viberater-backend -n viberater
+oc rollout restart deployment/viberater-frontend -n viberater
 
 # Port forwarding (for testing)
-oc port-forward svc/vibrater-backend-service 3000:80 -n vibrater
-oc port-forward svc/vibrater-frontend-service 8080:8080 -n vibrater
+oc port-forward svc/viberater-backend-service 3000:80 -n viberater
+oc port-forward svc/viberater-frontend-service 8080:8080 -n viberater
 
 # Scale backend (only 1 replica for SQLite!)
-oc scale deployment/vibrater-backend --replicas=1 -n vibrater
+oc scale deployment/viberater-backend --replicas=1 -n viberater
 
 # Scale frontend
-oc scale deployment/vibrater-frontend --replicas=2 -n vibrater
+oc scale deployment/viberater-frontend --replicas=2 -n viberater
 
 # Delete everything
-oc delete project vibrater
+oc delete project viberater
 ```
 
 ## Troubleshooting
@@ -238,8 +238,8 @@ oc delete project vibrater
 - Use `strategy: Recreate` to prevent multiple pods
 
 **Database not persisting:**
-- Check PVC is bound: `oc get pvc -n vibrater`
-- Verify volume mount: `oc describe pod <pod-name> -n vibrater`
+- Check PVC is bound: `oc get pvc -n viberater`
+- Verify volume mount: `oc describe pod <pod-name> -n viberater`
 
 ### Image Pull Errors
 
@@ -248,7 +248,7 @@ oc delete project vibrater
 **Fix:**
 ```bash
 # Check image name is correct
-oc describe pod <pod-name> -n vibrater
+oc describe pod <pod-name> -n viberater
 
 # For internal registry, create pull secret
 oc create secret docker-registry regcred \
@@ -264,35 +264,35 @@ oc secrets link default regcred --for=pull
 
 **Check route:**
 ```bash
-oc get route vibrater-frontend -n vibrater -o yaml
+oc get route viberater-frontend -n viberater -o yaml
 ```
 
 **Test route:**
 ```bash
-curl -I https://vibrater-frontend-vibrater.apps.example.com
+curl -I https://viberater-frontend-viberater.apps.example.com
 ```
 
 **Check service:**
 ```bash
-oc get svc -n vibrater
-oc describe svc vibrater-frontend-service -n vibrater
+oc get svc -n viberater
+oc describe svc viberater-frontend-service -n viberater
 ```
 
 ### CORS Errors
 
 Update CORS_ORIGIN in ConfigMap to match your route:
 ```bash
-oc edit configmap vibrater-config -n vibrater
+oc edit configmap viberater-config -n viberater
 ```
 
 Set to your frontend route URL:
 ```yaml
-CORS_ORIGIN: https://vibrater-frontend-vibrater.apps.example.com
+CORS_ORIGIN: https://viberater-frontend-viberater.apps.example.com
 ```
 
 Restart backend:
 ```bash
-oc rollout restart deployment/vibrater-backend -n vibrater
+oc rollout restart deployment/viberater-backend -n viberater
 ```
 
 ## Security Considerations
@@ -308,7 +308,7 @@ oc rollout restart deployment/vibrater-backend -n vibrater
 
 **Resources:**
 - Set appropriate resource limits
-- Monitor resource usage: `oc adm top pods -n vibrater`
+- Monitor resource usage: `oc adm top pods -n viberater`
 
 ## Scaling
 
@@ -327,20 +327,20 @@ oc rollout restart deployment/vibrater-backend -n vibrater
 **Health checks:**
 ```bash
 # Backend health
-curl http://vibrater-backend-vibrater.apps.example.com/health
+curl http://viberater-backend-viberater.apps.example.com/health
 
 # Frontend health
-curl http://vibrater-frontend-vibrater.apps.example.com/
+curl http://viberater-frontend-viberater.apps.example.com/
 ```
 
 **View events:**
 ```bash
-oc get events -n vibrater --sort-by='.lastTimestamp'
+oc get events -n viberater --sort-by='.lastTimestamp'
 ```
 
 **Resource usage:**
 ```bash
-oc adm top pods -n vibrater
+oc adm top pods -n viberater
 oc adm top nodes
 ```
 
@@ -363,5 +363,5 @@ oc adm top nodes
 ## Additional Resources
 
 - [OpenShift Documentation](https://docs.openshift.com/)
-- [Vibrater Documentation](../DOCS.md)
-- [Vibrater User Guide](../GUIDE.md)
+- [viberater Documentation](../DOCS.md)
+- [viberater User Guide](../GUIDE.md)

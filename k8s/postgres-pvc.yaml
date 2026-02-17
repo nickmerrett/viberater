@@ -2,7 +2,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: postgres-pvc
-  namespace: vibrater
+  namespace: viberater
 spec:
   accessModes:
     - ReadWriteOnce

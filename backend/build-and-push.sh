@@ -1,16 +1,16 @@
 #!/bin/bash
 
-# Build and push Vibrater backend container image
+# Build and push viberater backend container image
 # Usage: ./build-and-push.sh [registry] [version]
 
 set -e
 
 REGISTRY=${1:-"ghcr.io/yourusername"}
 VERSION=${2:-"latest"}
-IMAGE_NAME="vibrater-backend"
+IMAGE_NAME="viberater-backend"
 FULL_IMAGE="$REGISTRY/$IMAGE_NAME:$VERSION"
 
-echo "Building Vibrater backend container image..."
+echo "Building viberater backend container image..."
 echo "Image: $FULL_IMAGE"
 echo ""
 

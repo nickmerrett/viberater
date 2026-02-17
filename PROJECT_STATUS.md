@@ -1,4 +1,4 @@
-# Vibrater V2 - Project Status
+# viberater V2 - Project Status
 
 **Last Updated:** 2025-12-26
 **Phase:** 4 - Frontend Updates (In Progress)
@@ -109,8 +109,8 @@ curl http://localhost:3000/health
 
 ```bash
 # Build and push image
-cd vibrater-backend
-./build-and-push.sh your-registry/vibrater-backend v1.0.0
+cd viberater-backend
+./build-and-push.sh your-registry/viberater-backend v1.0.0
 
 # Deploy to Kubernetes
 kubectl apply -k k8s/
@@ -123,21 +123,21 @@ See `GETTING_STARTED.md` for detailed instructions.
 ## 📁 Project Structure
 
 ```
-vibrater/
+viberater/
 ├── ARCHITECTURE.md           # Complete system design (55k words)
 ├── GETTING_STARTED.md        # Setup and deployment guide
 ├── PROJECT_STATUS.md         # This file
-├── VIBRATER_SPEC.md         # Original V2 vision
+├── viberater_SPEC.md         # Original V2 vision
 ├── docker-compose.yml        # Local development
 ├── .env.example             # Environment template
 │
-├── vibrater/                # V1 PWA (existing)
+├── viberater/                # V1 PWA (existing)
 │   ├── index.html
 │   ├── app.js
 │   ├── style.css
 │   └── ...
 │
-├── vibrater-backend/        # V2 Backend API (NEW!)
+├── viberater-backend/        # V2 Backend API (NEW!)
 │   ├── package.json
 │   ├── Dockerfile
 │   ├── build-and-push.sh
@@ -404,9 +404,9 @@ By building Phase 1, you now have:
 
 - **Architecture:** `ARCHITECTURE.md` - Complete system design
 - **Getting Started:** `GETTING_STARTED.md` - Setup guide
-- **Backend API:** `vibrater-backend/README.md` - API reference
+- **Backend API:** `viberater-backend/README.md` - API reference
 - **Kubernetes:** `k8s/README.md` - Deployment guide
-- **Original Spec:** `VIBRATER_SPEC.md` - V2 vision
+- **Original Spec:** `viberater_SPEC.md` - V2 vision
 
 ---
 

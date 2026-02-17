@@ -49,7 +49,7 @@ export default function Dashboard() {
       <header className="glass border-b border-white/10 px-6 py-4 flex-shrink-0">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold bg-gradient-accent bg-clip-text text-transparent">
-            Vibrater
+            viberater
           </h1>
 
           <div className="flex items-center gap-4">

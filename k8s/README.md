@@ -1,6 +1,6 @@
-# Vibrater Kubernetes Deployment
+# viberater Kubernetes Deployment
 
-Deploy Vibrater to any Kubernetes cluster (local, cloud, or self-hosted).
+Deploy viberater to any Kubernetes cluster (local, cloud, or self-hosted).
 
 ## 🔴 OpenShift Users
 
@@ -8,7 +8,7 @@ Deploy Vibrater to any Kubernetes cluster (local, cloud, or self-hosted).
 
 ## Database Options
 
-Vibrater supports both **SQLite** and **PostgreSQL**. Choose based on your needs:
+viberater supports both **SQLite** and **PostgreSQL**. Choose based on your needs:
 
 ### SQLite (Recommended for Small/Medium Deployments)
 
@@ -57,24 +57,24 @@ kubectl apply -f backend-deployment.yaml
 
 ```bash
 # From project root
-cd vibrater-backend
+cd viberater-backend
 
 # Build the image
-docker build -t yourusername/vibrater-backend:latest .
+docker build -t yourusername/viberater-backend:latest .
 
 # Push to registry
-docker push yourusername/vibrater-backend:latest
+docker push yourusername/viberater-backend:latest
 
 # Or use GitHub Container Registry
-docker tag yourusername/vibrater-backend:latest ghcr.io/yourusername/vibrater-backend:latest
-docker push ghcr.io/yourusername/vibrater-backend:latest
+docker tag yourusername/viberater-backend:latest ghcr.io/yourusername/viberater-backend:latest
+docker push ghcr.io/yourusername/viberater-backend:latest
 ```
 
 ### 2. Update Image Reference
 
 Edit `k8s/backend-deployment.yaml` and replace:
 ```yaml
-image: ghcr.io/yourusername/vibrater-backend:latest
+image: ghcr.io/yourusername/viberater-backend:latest
 ```
 
 With your actual image URL.
@@ -83,11 +83,11 @@ With your actual image URL.
 
 ```bash
 # Create namespace first
-kubectl create namespace vibrater
+kubectl create namespace viberater
 
 # Create secrets
-kubectl create secret generic vibrater-secrets \
-  --namespace=vibrater \
+kubectl create secret generic viberater-secrets \
+  --namespace=viberater \
   --from-literal=DATABASE_PASSWORD='your-strong-password-here' \
   --from-literal=JWT_SECRET='your-long-random-secret-min-32-chars' \
   --from-literal=CLAUDE_API_KEY='sk-ant-your-key' \
@@ -100,13 +100,13 @@ kubectl create secret generic vibrater-secrets \
 Edit `k8s/configmap.yaml` to set your domain:
 
 ```yaml
-CORS_ORIGIN: "https://vibrater.yourdomain.com"
+CORS_ORIGIN: "https://viberater.yourdomain.com"
 ```
 
 Edit `k8s/ingress.yaml` to set your domain:
 
 ```yaml
-host: vibrater.yourdomain.com
+host: viberater.yourdomain.com
 ```
 
 ### 5. Deploy
@@ -128,26 +128,26 @@ kubectl apply -f k8s/ingress.yaml
 
 ```bash
 # Watch pods starting
-kubectl get pods -n vibrater -w
+kubectl get pods -n viberater -w
 
 # Check logs
-kubectl logs -n vibrater -l app=vibrater-backend -f
+kubectl logs -n viberater -l app=viberater-backend -f
 
 # Check PostgreSQL
-kubectl logs -n vibrater -l app=postgres -f
+kubectl logs -n viberater -l app=postgres -f
 
 # Get service status
-kubectl get svc -n vibrater
+kubectl get svc -n viberater
 ```
 
 ### 7. Access the API
 
 ```bash
 # Get ingress address
-kubectl get ingress -n vibrater
+kubectl get ingress -n viberater
 
 # Test health endpoint
-curl https://vibrater.yourdomain.com/health
+curl https://viberater.yourdomain.com/health
 ```
 
 ## Local Development with Minikube
@@ -161,11 +161,11 @@ minikube addons enable ingress
 
 # Build image directly in minikube
 eval $(minikube docker-env)
-cd vibrater-backend
-docker build -t vibrater-backend:dev .
+cd viberater-backend
+docker build -t viberater-backend:dev .
 
 # Update backend-deployment.yaml to use local image:
-# image: vibrater-backend:dev
+# image: viberater-backend:dev
 # imagePullPolicy: Never
 
 # Deploy
@@ -175,22 +175,22 @@ kubectl apply -k k8s/
 minikube ip
 
 # Add to /etc/hosts
-echo "$(minikube ip) vibrater.local" | sudo tee -a /etc/hosts
+echo "$(minikube ip) viberater.local" | sudo tee -a /etc/hosts
 
 # Access
-curl http://vibrater.local/health
+curl http://viberater.local/health
 ```
 
 ## Local Development with Kind
 
 ```bash
 # Create kind cluster
-kind create cluster --name vibrater
+kind create cluster --name viberater
 
 # Load image into kind
-cd vibrater-backend
-docker build -t vibrater-backend:dev .
-kind load docker-image vibrater-backend:dev --name vibrater
+cd viberater-backend
+docker build -t viberater-backend:dev .
+kind load docker-image viberater-backend:dev --name viberater
 
 # Install nginx ingress
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
@@ -205,7 +205,7 @@ kubectl wait --namespace ingress-nginx \
 kubectl apply -k k8s/
 
 # Port forward (since kind doesn't have LoadBalancer)
-kubectl port-forward -n vibrater svc/vibrater-backend-service 3000:80
+kubectl port-forward -n viberater svc/viberater-backend-service 3000:80
 ```
 
 ## Cloud Deployments
@@ -215,7 +215,7 @@ kubectl port-forward -n vibrater svc/vibrater-backend-service 3000:80
 ```bash
 # Create EKS cluster (using eksctl)
 eksctl create cluster \
-  --name vibrater \
+  --name viberater \
   --region us-east-1 \
   --nodegroup-name standard-workers \
   --node-type t3.medium \
@@ -227,7 +227,7 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/cont
 # Install cert-manager for SSL
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.yaml
 
-# Deploy Vibrater
+# Deploy viberater
 kubectl apply -k k8s/
 
 # Get LoadBalancer address
@@ -240,18 +240,18 @@ kubectl get svc -n ingress-nginx
 
 ```bash
 # Create GKE cluster
-gcloud container clusters create vibrater \
+gcloud container clusters create viberater \
   --zone us-central1-a \
   --num-nodes 2 \
   --machine-type n1-standard-2
 
 # Get credentials
-gcloud container clusters get-credentials vibrater --zone us-central1-a
+gcloud container clusters get-credentials viberater --zone us-central1-a
 
 # Install nginx ingress
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
 
-# Deploy Vibrater
+# Deploy viberater
 kubectl apply -k k8s/
 ```
 
@@ -259,14 +259,14 @@ kubectl apply -k k8s/
 
 ```bash
 # Create cluster via UI or doctl
-doctl kubernetes cluster create vibrater \
+doctl kubernetes cluster create viberater \
   --region nyc1 \
   --size s-2vcpu-2gb \
   --count 2
 
 # Install nginx ingress (comes pre-installed on DOKS)
 
-# Deploy Vibrater
+# Deploy viberater
 kubectl apply -k k8s/
 ```
 
@@ -322,7 +322,7 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: postgres-backup
-  namespace: vibrater
+  namespace: viberater
 spec:
   schedule: "0 2 * * *"  # 2 AM daily
   jobTemplate:
@@ -336,13 +336,13 @@ spec:
             - sh
             - -c
             - |
-              pg_dump -h postgres-service -U vibrater vibrater | \
-              gzip > /backup/vibrater-$(date +%Y%m%d-%H%M%S).sql.gz
+              pg_dump -h postgres-service -U viberater viberater | \
+              gzip > /backup/viberater-$(date +%Y%m%d-%H%M%S).sql.gz
             env:
             - name: PGPASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: vibrater-secrets
+                  name: viberater-secrets
                   key: DATABASE_PASSWORD
             volumeMounts:
             - name: backup
@@ -417,29 +417,29 @@ For larger deployments, consider:
 
 ```bash
 # View all resources
-kubectl get all -n vibrater
+kubectl get all -n viberater
 
 # Describe a pod
-kubectl describe pod -n vibrater <pod-name>
+kubectl describe pod -n viberater <pod-name>
 
 # Get logs
-kubectl logs -n vibrater <pod-name> -f
+kubectl logs -n viberater <pod-name> -f
 
 # Execute command in pod
-kubectl exec -it -n vibrater <pod-name> -- /bin/sh
+kubectl exec -it -n viberater <pod-name> -- /bin/sh
 
 # Port forward for debugging
-kubectl port-forward -n vibrater svc/vibrater-backend-service 3000:80
+kubectl port-forward -n viberater svc/viberater-backend-service 3000:80
 
 # Delete everything
 kubectl delete -k k8s/
-kubectl delete namespace vibrater
+kubectl delete namespace viberater
 
 # Restart deployment
-kubectl rollout restart deployment/vibrater-backend -n vibrater
+kubectl rollout restart deployment/viberater-backend -n viberater
 
 # View resource usage
-kubectl top pods -n vibrater
+kubectl top pods -n viberater
 kubectl top nodes
 ```
 
@@ -448,8 +448,8 @@ kubectl top nodes
 ### Pods not starting
 
 ```bash
-kubectl describe pod -n vibrater <pod-name>
-kubectl logs -n vibrater <pod-name>
+kubectl describe pod -n viberater <pod-name>
+kubectl logs -n viberater <pod-name>
 ```
 
 Common issues:
@@ -461,29 +461,29 @@ Common issues:
 
 ```bash
 # Check PostgreSQL is running
-kubectl get pods -n vibrater -l app=postgres
+kubectl get pods -n viberater -l app=postgres
 
 # Check PostgreSQL logs
-kubectl logs -n vibrater -l app=postgres
+kubectl logs -n viberater -l app=postgres
 
 # Test connection from backend pod
-kubectl exec -it -n vibrater <backend-pod> -- sh
+kubectl exec -it -n viberater <backend-pod> -- sh
 apk add postgresql-client
-psql -h postgres-service -U vibrater -d vibrater
+psql -h postgres-service -U viberater -d viberater
 ```
 
 ### Ingress not working
 
 ```bash
 # Check ingress
-kubectl get ingress -n vibrater
-kubectl describe ingress -n vibrater vibrater-ingress
+kubectl get ingress -n viberater
+kubectl describe ingress -n viberater viberater-ingress
 
 # Check ingress controller
 kubectl get pods -n ingress-nginx
 
 # Check DNS
-nslookup vibrater.yourdomain.com
+nslookup viberater.yourdomain.com
 ```
 
 ## Next Steps

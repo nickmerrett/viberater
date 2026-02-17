@@ -1,4 +1,4 @@
--- Vibrater Database Schema
+-- viberater Database Schema
 -- Migration 001: Initial Schema
 
 -- Enable UUID extension

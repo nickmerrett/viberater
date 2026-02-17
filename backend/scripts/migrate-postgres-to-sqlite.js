@@ -16,7 +16,7 @@ const pgPool = new Pool({
 
 // SQLite connection
 const sqliteDbPath = process.env.SQLITE_DIR || join(__dirname, '../storage');
-const sqliteDb = new Database(join(sqliteDbPath, 'vibrater.db'));
+const sqliteDb = new Database(join(sqliteDbPath, 'viberater.db'));
 
 const tables = [
   'users',
