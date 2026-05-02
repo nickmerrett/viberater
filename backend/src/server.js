@@ -14,6 +14,7 @@ import tasksRoutes from './routes/tasks.js';
 import aiRoutes from './routes/ai.js';
 import gitRoutes from './routes/git.js';
 import syncRoutes from './routes/sync.js';
+import remindersRoutes from './routes/reminders.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -72,6 +73,7 @@ app.use('/api/tasks', tasksRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/git', gitRoutes);
 app.use('/api/sync', syncRoutes);
+app.use('/api/reminders', remindersRoutes);
 
 // 404 handler
 app.use((req, res) => {

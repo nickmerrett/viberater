@@ -345,8 +345,8 @@ export default function IdeasView() {
   return (
     <div className="h-full flex flex-col">
       {/* Filter Bar */}
-      <div className="glass border-b border-white/10 px-6 py-4 flex-shrink-0 space-y-3">
-        <div className="flex items-center justify-between gap-4">
+      <div className="glass border-b border-white/10 px-3 py-2 sm:px-6 sm:py-3 flex-shrink-0 space-y-2">
+        <div className="flex items-center justify-between gap-2">
           {/* Search */}
           <div className="flex-1 max-w-md">
             <input
@@ -354,23 +354,23 @@ export default function IdeasView() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="🔍 Search ideas, tags..."
-              className="input w-full"
+              className="input w-full text-sm py-1.5"
             />
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             <button
               onClick={() => setShowIdeation(true)}
-              className="glass px-4 py-2 rounded-lg hover:bg-accent/20 hover:text-accent transition-all text-sm font-medium"
+              className="glass px-2.5 py-1.5 rounded-lg hover:bg-accent/20 hover:text-accent transition-all text-xs font-medium"
             >
-              💭 Brainstorm
+              💭
             </button>
             <button
               onClick={() => setShowNewIdea(true)}
-              className="btn-primary btn-sm"
+              className="btn-primary btn-sm text-xs px-2.5 py-1.5"
             >
-              + New Idea
+              + New
             </button>
           </div>
         </div>
@@ -474,7 +474,7 @@ export default function IdeasView() {
       </div>
 
       {/* Ideas List */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-6">
         {loading ? (
           <div className="text-center text-gray-400 py-12">Loading ideas...</div>
         ) : sortedIdeas.length === 0 ? (
@@ -482,10 +482,10 @@ export default function IdeasView() {
             No ideas yet. Create your first one!
           </div>
         ) : (
-          <div className="grid gap-4 max-w-4xl mx-auto">
+          <div className="grid gap-2 sm:gap-4 max-w-4xl mx-auto">
             {sortedIdeas.map((idea) => (
               <div key={idea.id} className="card">
-                <div className="flex items-start justify-between mb-3">
+                <div className="flex items-start justify-between mb-2">
                   <div className="flex-1">
                     {editingTitleId === idea.id ? (
                       <div className="flex gap-2 items-center">
@@ -515,7 +515,7 @@ export default function IdeasView() {
                       </div>
                     ) : (
                       <h3
-                        className="text-xl font-semibold cursor-pointer hover:text-accent transition-colors"
+                        className="text-base sm:text-xl font-semibold cursor-pointer hover:text-accent transition-colors"
                         onClick={() => startEditingTitle(idea)}
                         title="Click to edit title"
                       >
@@ -528,14 +528,14 @@ export default function IdeasView() {
                       </span>
                     )}
                   </div>
-                  <span className="text-2xl">{idea.status === 'promoted-to-project' ? '🚀' : '💡'}</span>
+                  <span className="text-lg">{idea.status === 'promoted-to-project' ? '🚀' : '💡'}</span>
                 </div>
 
-                <p className="text-gray-400 mb-4">{idea.summary}</p>
+                <p className="text-gray-400 text-sm mb-2">{idea.summary}</p>
 
                 {/* Tags */}
                 {idea.tags && idea.tags.length > 0 && (
-                  <div className="flex gap-2 mb-3 flex-wrap">
+                  <div className="flex gap-1.5 mb-2 flex-wrap">
                     {idea.tags.map((tag, i) => (
                       <span
                         key={i}
@@ -551,11 +551,11 @@ export default function IdeasView() {
 
                 {/* Vibe */}
                 {idea.vibe && idea.vibe.length > 0 && (
-                  <div className="flex gap-2 mb-4 flex-wrap">
+                  <div className="flex gap-1.5 mb-2 flex-wrap">
                     {idea.vibe.map((v, i) => (
                       <span
                         key={i}
-                        className="px-3 py-1 rounded-full text-sm glass"
+                        className="px-2 py-0.5 rounded-full text-xs glass"
                       >
                         {v}
                       </span>
@@ -582,10 +582,10 @@ export default function IdeasView() {
                     )}
                   </div>
 
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="flex gap-1.5 flex-wrap">
                     <button
                       onClick={() => setViewingIdea(idea)}
-                      className="px-3 py-1 rounded-lg glass hover:bg-blue-500/20 hover:text-blue-400 transition-all"
+                      className="px-2 py-0.5 text-xs rounded-lg glass hover:bg-blue-500/20 hover:text-blue-400 transition-all"
                     >
                       📖 View
                     </button>
@@ -593,7 +593,7 @@ export default function IdeasView() {
                       <>
                         <button
                           onClick={() => setIdeatingFromIdea(idea)}
-                          className="px-3 py-1 rounded-lg glass hover:bg-purple-500/20 hover:text-purple-400 transition-all"
+                          className="px-2 py-0.5 text-xs rounded-lg glass hover:bg-purple-500/20 hover:text-purple-400 transition-all"
                           title="Riff on this idea with AI"
                         >
                           💭 Riff
@@ -602,13 +602,13 @@ export default function IdeasView() {
                           <>
                             <button
                               onClick={() => setRefiningIdea(idea)}
-                              className="px-3 py-1 rounded-lg glass hover:bg-accent/20 hover:text-accent transition-all"
+                              className="px-2 py-0.5 text-xs rounded-lg glass hover:bg-accent/20 hover:text-accent transition-all"
                             >
                               🤖 {idea.status === 'refined' ? 'Continue' : 'Refine'}
                             </button>
                             <button
                               onClick={() => handlePromote(idea.id)}
-                              className="px-3 py-1 rounded-lg glass hover:bg-primary/20 hover:text-primary transition-all"
+                              className="px-2 py-0.5 text-xs rounded-lg glass hover:bg-primary/20 hover:text-primary transition-all"
                             >
                               Promote
                             </button>
@@ -618,7 +618,7 @@ export default function IdeasView() {
                     )}
                     <button
                       onClick={() => handleArchive(idea.id, !idea.archived)}
-                      className={`px-3 py-1 rounded-lg glass transition-all ${
+                      className={`px-2 py-0.5 text-xs rounded-lg glass transition-all ${
                         idea.archived
                           ? 'hover:bg-green-500/20 hover:text-green-400'
                           : 'hover:bg-orange-500/20 hover:text-orange-400'

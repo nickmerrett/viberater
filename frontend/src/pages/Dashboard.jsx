@@ -5,6 +5,7 @@ import { useDataStore } from '../store/useDataStore';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import IdeasView from '../components/IdeasView';
 import ProjectsView from '../components/ProjectsView';
+import RemindersView from '../components/RemindersView';
 import PWAInstallPrompt from '../components/PWAInstallPrompt';
 import OfflineIndicator from '../components/OfflineIndicator';
 import HealthCheck from '../components/HealthCheck';
@@ -34,8 +35,9 @@ export default function Dashboard() {
   };
 
   const tabs = [
-    { id: 'ideas', label: '💡 Ideas', icon: '💡' },
-    { id: 'projects', label: '🚀 Projects', icon: '🚀' },
+    { id: 'ideas', label: '💡 Ideas' },
+    { id: 'projects', label: '🚀 Projects' },
+    { id: 'reminders', label: '🔔 Reminders' },
   ];
 
   return (
@@ -46,19 +48,19 @@ export default function Dashboard() {
       <MobileConsole />
       <div className="h-screen flex flex-col">
       {/* Header */}
-      <header className="glass border-b border-white/10 px-6 py-4 flex-shrink-0">
+      <header className="glass border-b border-white/10 px-4 py-2 sm:px-6 sm:py-3 flex-shrink-0">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold bg-gradient-accent bg-clip-text text-transparent">
+          <h1 className="text-lg sm:text-2xl font-bold bg-gradient-accent bg-clip-text text-transparent">
             viberater
           </h1>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <div className="hidden sm:block text-sm text-gray-400">
               {user?.name}
             </div>
             <button
               onClick={() => setShowMenu(!showMenu)}
-              className="w-10 h-10 rounded-xl glass hover:bg-white/5 flex items-center justify-center transition-all"
+              className="w-8 h-8 rounded-lg glass hover:bg-white/5 flex items-center justify-center transition-all text-sm"
             >
               ☰
             </button>
@@ -119,13 +121,13 @@ export default function Dashboard() {
       )}
 
       {/* Navigation Tabs */}
-      <nav className="glass border-b border-white/10 px-6 py-3 flex gap-2 flex-shrink-0">
+      <nav className="glass border-b border-white/10 px-3 py-1.5 sm:px-6 sm:py-2 flex gap-1.5 flex-shrink-0">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`
-              px-6 py-2.5 rounded-xl font-semibold transition-all duration-300
+              px-3 py-1.5 sm:px-5 sm:py-2 rounded-lg text-sm font-medium transition-all duration-300
               ${activeTab === tab.id
                 ? 'bg-primary/20 text-white border border-primary shadow-lg shadow-primary/30'
                 : 'glass hover:bg-white/5'
@@ -141,6 +143,7 @@ export default function Dashboard() {
       <main className="flex-1 overflow-hidden relative">
         {activeTab === 'ideas' && <IdeasView />}
         {activeTab === 'projects' && <ProjectsView />}
+        {activeTab === 'reminders' && <RemindersView />}
 
         {/* Version Footer */}
         <div className="absolute bottom-2 left-4 text-xs text-gray-600 pointer-events-none">

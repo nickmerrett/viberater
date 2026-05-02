@@ -269,6 +269,42 @@ class APIClient {
       body: JSON.stringify({ idea, ...options }),
     });
   }
+  // Reminders endpoints
+  async getReminders() {
+    return this.request('/reminders');
+  }
+
+  async createReminder(data) {
+    return this.request('/reminders', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateReminder(id, data) {
+    return this.request(`/reminders/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async completeReminder(id) {
+    return this.request(`/reminders/${id}/complete`, { method: 'PATCH' });
+  }
+
+  async deleteReminder(id) {
+    return this.request(`/reminders/${id}`, { method: 'DELETE' });
+  }
+
+  async suggestReminder(context) {
+    return this.request('/ai/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        messages: [{ role: 'user', content: context }],
+        systemPrompt: 'You are a helpful assistant. The user wants to set a reminder. Extract a concise reminder title (max 10 words) and suggest a due date if mentioned. Reply with JSON: {"title": "...", "due_date": "YYYY-MM-DD or null", "note": "..."}. Today is ' + new Date().toISOString().split('T')[0],
+      }),
+    });
+  }
 }
 
 export const api = new APIClient();

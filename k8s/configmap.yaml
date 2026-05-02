@@ -9,7 +9,7 @@ data:
   DATABASE_PORT: "5432"
   DATABASE_NAME: "viberater"
   DATABASE_USER: "viberater"
-  BACKEND_URL: "viberater-backend-service:3000"
+  BACKEND_URL: "viberater-backend-service:80"
   CORS_ORIGIN: "https://viberater.apps.homeserv.merrett.lan"
   DEFAULT_AI_PROVIDER: "claude"
   MODEL_PRIMARY: "claude-4-5-sonnet-20240620"
