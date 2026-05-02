@@ -29,8 +29,8 @@ FROM docker.io/nginx:alpine
 # Copy built app from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy OpenShift-compatible nginx configuration
-COPY nginx-openshift.conf /etc/nginx/nginx.conf
+# Copy nginx config as a template — BACKEND_URL is substituted at runtime
+COPY nginx-openshift.conf /etc/nginx/nginx.conf.template
 
 # Create temp directories and set permissions for arbitrary UID
 RUN mkdir -p /tmp/client_temp /tmp/proxy_temp /tmp/fastcgi_temp /tmp/uwsgi_temp /tmp/scgi_temp && \
@@ -52,4 +52,4 @@ USER 1001
 # Expose non-privileged port
 EXPOSE 8080
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["/bin/sh", "-c", "envsubst '$BACKEND_URL' < /etc/nginx/nginx.conf.template > /tmp/nginx.conf && nginx -c /tmp/nginx.conf -g 'daemon off;'"]
