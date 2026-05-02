@@ -1,0 +1,332 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: viberater-build-test-deploy
+  namespace: build
+  labels:
+    app: viberater-pipeline
+    managed-by: kustomize
+spec:
+  description: |
+    CI/CD pipeline for Viberater platform:
+    - Fetches git repository
+    - Runs backend unit tests (fast feedback)
+    - Runs frontend build check
+    - Builds backend and frontend Docker images
+    - Runs integration tests against built images
+    - Deploys to Kubernetes cluster
+  params:
+    - name: repo-url
+      description: The git repository URL to clone from.
+      type: string
+    - name: tag-name
+      description: The git tag to clone.
+      type: string
+    - name: backend-image
+      description: 'Full image path for backend (e.g. registry/viberater-backend:latest)'
+      type: string
+    - name: frontend-image
+      description: 'Full image path for frontend (e.g. registry/viberater-frontend:latest)'
+      type: string
+    - name: deployment-manifest
+      description: Path to the deployment manifests directory.
+      type: string
+  workspaces:
+    - name: workspace
+    - name: basic-auth
+    - name: empty-dir
+    - name: database
+  tasks:
+    - name: fetch-repository
+      taskRef:
+        kind: Task
+        name: git-clone
+      params:
+        - name: url
+          value: $(params.repo-url)
+        - name: revision
+          value: $(params.tag-name)
+        - name: deleteExisting
+          value: 'true'
+      workspaces:
+        - name: output
+          workspace: workspace
+        - name: basic-auth
+          workspace: basic-auth
+
+    - name: backend-unit-tests
+      runAfter:
+        - fetch-repository
+      workspaces:
+        - name: source
+          workspace: workspace
+        - name: empty-dir
+          workspace: empty-dir
+        - name: database
+          workspace: database
+      taskSpec:
+        workspaces:
+          - name: source
+          - name: empty-dir
+            mountPath: /.npm
+          - name: database
+            mountPath: /app/data
+        stepTemplate:
+          computeResources: {}
+          workingDir: $(workspaces.source.path)/backend
+        steps:
+          - name: run-tests
+            image: 'docker.io/library/node:20-alpine'
+            securityContext:
+              runAsUser: 65532
+            env:
+              - name: NODE_ENV
+                value: test
+              - name: JWT_SECRET
+                value: test-secret-key-for-ci
+              - name: DB_TYPE
+                value: sqlite
+              - name: SQLITE_DIR
+                value: /tmp
+            script: |
+              #!/bin/sh
+              set -e
+
+              echo "=== Copying source to writable directory ==="
+              cp -r . /tmp/backend
+              cd /tmp/backend
+
+              echo "=== Installing dependencies ==="
+              npm install
+
+              echo "=== Running backend unit tests ==="
+              npm test
+
+              echo "=== Backend unit tests passed ==="
+
+    - name: frontend-tests
+      runAfter:
+        - fetch-repository
+      workspaces:
+        - name: source
+          workspace: workspace
+        - name: empty-dir
+          workspace: empty-dir
+      taskSpec:
+        workspaces:
+          - name: source
+          - name: empty-dir
+            mountPath: /.npm
+        stepTemplate:
+          computeResources: {}
+          workingDir: $(workspaces.source.path)/frontend
+        steps:
+          - name: run-tests
+            image: 'docker.io/library/node:24-alpine'
+            securityContext:
+              runAsUser: 65532
+            script: |
+              #!/bin/sh
+              set -e
+
+              # Copy source to writable directory (workspace may have permission issues)
+              echo "=== Copying source to writable directory ==="
+              cp -r $(workspaces.source.path)/frontend /tmp/frontend
+              cd /tmp/frontend
+
+              echo "=== Installing dependencies ==="
+              npm install
+
+              echo "=== Running frontend unit tests ==="
+              npm test
+
+              echo "=== Running frontend build check ==="
+              npm run build
+
+              echo "=== Frontend build check passed ==="
+
+    - name: build-backend
+      runAfter:
+        - backend-unit-tests
+        - frontend-tests
+      taskRef:
+        kind: Task
+        name: buildah
+      params:
+        - name: IMAGE
+          value: $(params.backend-image)
+        - name: DOCKERFILE
+          value: backend/Dockerfile
+        - name: CONTEXT
+          value: backend
+        - name: TLSVERIFY
+          value: 'false'
+        - name: STORAGE_DRIVER
+          value: vfs
+      workspaces:
+        - name: source
+          workspace: workspace
+
+    - name: build-frontend
+      runAfter:
+        - backend-unit-tests
+        - frontend-tests
+      taskRef:
+        kind: Task
+        name: buildah
+      params:
+        - name: IMAGE
+          value: $(params.frontend-image)
+        - name: DOCKERFILE
+          value: frontend/Dockerfile
+        - name: CONTEXT
+          value: frontend
+        - name: TLSVERIFY
+          value: 'false'
+        - name: STORAGE_DRIVER
+          value: vfs
+      workspaces:
+        - name: source
+          workspace: workspace
+
+    - name: backend-integration-tests
+      runAfter:
+        - build-backend
+      params:
+        - name: backend-image
+          value: $(params.backend-image)
+      workspaces:
+        - name: source
+          workspace: workspace
+      taskSpec:
+        params:
+          - name: backend-image
+            type: string
+        workspaces:
+          - name: source
+        steps:
+          - name: run-integration-tests
+            image: $(params.backend-image)
+            env:
+              - name: NODE_ENV
+                value: test
+              - name: JWT_SECRET
+                value: test-secret-key-for-ci
+              - name: DB_TYPE
+                value: sqlite
+              - name: SQLITE_DIR
+                value: /tmp
+            workingDir: /app
+            script: |
+              #!/bin/sh
+              set -e
+              echo "=== Running backend integration tests ==="
+              echo "Testing against built image: $(params.backend-image)"
+
+              npm test
+
+              echo "=== Backend integration tests passed ==="
+
+    - name: smoke-tests
+      runAfter:
+        - backend-integration-tests
+        - build-frontend
+      params:
+        - name: backend-image
+          value: $(params.backend-image)
+        - name: frontend-image
+          value: $(params.frontend-image)
+      workspaces:
+        - name: source
+          workspace: workspace
+      taskSpec:
+        params:
+          - name: backend-image
+            type: string
+          - name: frontend-image
+            type: string
+        workspaces:
+          - name: source
+        sidecars:
+          - name: backend
+            image: $(params.backend-image)
+            env:
+              - name: NODE_ENV
+                value: test
+              - name: JWT_SECRET
+                value: smoke-test-secret
+              - name: DB_TYPE
+                value: sqlite
+              - name: SQLITE_DIR
+                value: /tmp
+              - name: PORT
+                value: '3000'
+            readinessProbe:
+              httpGet:
+                path: /health
+                port: 3000
+              initialDelaySeconds: 10
+              periodSeconds: 5
+        steps:
+          - name: wait-for-backend
+            image: 'curlimages/curl:latest'
+            script: |
+              #!/bin/sh
+              set -e
+              echo "=== Waiting for backend to be ready ==="
+
+              for i in $(seq 1 30); do
+                if curl -s http://localhost:3000/health > /dev/null 2>&1; then
+                  echo "Backend is healthy!"
+                  break
+                fi
+                echo "Waiting for backend... ($i/30)"
+                sleep 2
+              done
+
+              curl -f http://localhost:3000/health || exit 1
+              echo "=== Backend health check passed ==="
+
+          - name: api-smoke-tests
+            image: 'curlimages/curl:latest'
+            script: |
+              #!/bin/sh
+              set -e
+              echo "=== Running API smoke tests ==="
+
+              echo "Testing /health..."
+              curl -f http://localhost:3000/health
+
+              echo "Testing /api/customers (expect 401 without auth)..."
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/customers)
+              if [ "$STATUS" = "401" ]; then
+                echo "Auth protection working correctly"
+              else
+                echo "Unexpected status: $STATUS"
+                exit 1
+              fi
+
+              echo "=== Smoke tests passed ==="
+
+    - name: deploy
+      runAfter:
+        - smoke-tests
+      taskRef:
+        kind: Task
+        name: kubernetes-actions
+      params:
+        - name: script
+          value: |
+            echo "=== Deploying Viberater ==="
+            kubectl apply -k k8s/
+            echo "----------"
+            kubectl rollout status deployment/viberater-backend -n viberater --timeout=120s
+            kubectl rollout status deployment/viberater-frontend -n viberater --timeout=120s
+            echo "----------"
+            kubectl get all -n viberater
+            echo "=== Deployment complete ==="
+      workspaces:
+        - name: kubeconfig-dir
+          workspace: empty-dir
+        - name: manifest-dir
+          workspace: workspace

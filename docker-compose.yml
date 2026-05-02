@@ -36,9 +36,9 @@ services:
       MODEL_PRIMARY: ${MODEL_PRIMARY:-claude-3-5-sonnet-20240620}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
     volumes:
-      - ./viberater-backend/src:/app/src:Z
-      - ./viberater-backend/storage:/app/storage:Z
-      - ./viberater-backend/logs:/app/logs:Z
+      - ./backend/src:/app/src:Z
+      - ./backend/storage:/app/storage:Z
+      - ./backend/logs:/app/logs:Z
     expose:
       - "3000"
     restart: unless-stopped
