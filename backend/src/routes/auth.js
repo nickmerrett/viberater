@@ -1,5 +1,6 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import { query } from '../config/database.js';
 import {
   generateAccessToken,
@@ -11,21 +12,46 @@ import { bootstrapAreas } from './areas.js';
 
 const router = express.Router();
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function hashToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+function tokenExpiresAt() {
+  return new Date(Date.now() + (parseInt(process.env.REFRESH_TOKEN_DAYS) || 30) * 24 * 60 * 60 * 1000);
+}
+
 // Register
 router.post('/register', async (req, res) => {
   try {
+    // Gate registration behind env flag
+    if (process.env.ALLOW_REGISTRATION === 'false') {
+      return res.status(403).json({ error: 'Registration is disabled' });
+    }
+
     const { email, password, name } = req.body;
 
-    // Validation
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password required' });
+    }
+
+    if (!EMAIL_RE.test(email)) {
+      return res.status(400).json({ error: 'Invalid email address' });
     }
 
     if (password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
 
-    // Check if user exists
+    if (password.length > 128) {
+      return res.status(400).json({ error: 'Password too long' });
+    }
+
+    if (name && name.length > 100) {
+      return res.status(400).json({ error: 'Name too long' });
+    }
+
     const existingUser = await query(
       'SELECT id FROM users WHERE email = $1',
       [email.toLowerCase()]
@@ -35,10 +61,8 @@ router.post('/register', async (req, res) => {
       return res.status(409).json({ error: 'Email already registered' });
     }
 
-    // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Create user
     const result = await query(
       `INSERT INTO users (email, name, password_hash)
        VALUES ($1, $2, $3)
@@ -48,29 +72,20 @@ router.post('/register', async (req, res) => {
 
     const user = result.rows[0];
 
-    // Generate tokens
     const accessToken = generateAccessToken(user.id, user.email);
     const refreshToken = generateRefreshToken(user.id, null);
 
-    // Store refresh token
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
     await query(
-      `INSERT INTO refresh_tokens (user_id, token, expires_at)
-       VALUES ($1, $2, $3)`,
-      [user.id, refreshToken, expiresAt]
+      `INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)`,
+      [user.id, hashToken(refreshToken), tokenExpiresAt()]
     );
 
-    // Bootstrap default areas for new user
     await bootstrapAreas(user.id);
 
     res.status(201).json({
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name
-      },
+      user: { id: user.id, email: user.email, name: user.name },
       accessToken,
-      refreshToken
+      refreshToken,
     });
   } catch (error) {
     console.error('Register error:', error);
@@ -87,7 +102,10 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password required' });
     }
 
-    // Find user
+    if (password.length > 128) {
+      return res.status(400).json({ error: 'Invalid credentials' });
+    }
+
     const result = await query(
       'SELECT id, email, name, password_hash FROM users WHERE email = $1',
       [email.toLowerCase()]
@@ -99,47 +117,36 @@ router.post('/login', async (req, res) => {
 
     const user = result.rows[0];
 
-    // Verify password
     const validPassword = await bcrypt.compare(password, user.password_hash);
-
     if (!validPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Register/update device if provided
     let dbDeviceId = null;
-    if (deviceId) {
+    if (deviceId && typeof deviceId === 'string' && deviceId.length <= 255) {
       const deviceResult = await query(
         `INSERT INTO devices (user_id, device_id, device_name, last_sync_at)
          VALUES ($1, $2, $3, NOW())
          ON CONFLICT (user_id, device_id)
          DO UPDATE SET device_name = $3, last_sync_at = NOW()
          RETURNING id`,
-        [user.id, deviceId, deviceName || 'Unknown Device']
+        [user.id, deviceId, (deviceName || 'Unknown Device').slice(0, 100)]
       );
       dbDeviceId = deviceResult.rows[0].id;
     }
 
-    // Generate tokens
     const accessToken = generateAccessToken(user.id, user.email);
     const refreshToken = generateRefreshToken(user.id, dbDeviceId);
 
-    // Store refresh token
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
     await query(
-      `INSERT INTO refresh_tokens (user_id, token, device_id, expires_at)
-       VALUES ($1, $2, $3, $4)`,
-      [user.id, refreshToken, dbDeviceId, expiresAt]
+      `INSERT INTO refresh_tokens (user_id, token, device_id, expires_at) VALUES ($1, $2, $3, $4)`,
+      [user.id, hashToken(refreshToken), dbDeviceId, tokenExpiresAt()]
     );
 
     res.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name
-      },
+      user: { id: user.id, email: user.email, name: user.name },
       accessToken,
-      refreshToken
+      refreshToken,
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -156,27 +163,36 @@ router.post('/refresh', async (req, res) => {
       return res.status(400).json({ error: 'Refresh token required' });
     }
 
-    // Verify token
-    const decoded = verifyRefreshToken(refreshToken);
+    // Verify JWT signature + type before hitting DB
+    verifyRefreshToken(refreshToken);
 
-    // Check if token exists in database and is not expired
+    const tokenHash = hashToken(refreshToken);
+
     const result = await query(
       `SELECT rt.*, u.email FROM refresh_tokens rt
        JOIN users u ON rt.user_id = u.id
        WHERE rt.token = $1 AND rt.expires_at > NOW()`,
-      [refreshToken]
+      [tokenHash]
     );
 
     if (result.rows.length === 0) {
       return res.status(403).json({ error: 'Invalid or expired refresh token' });
     }
 
-    const { user_id, email } = result.rows[0];
+    const { user_id, email, device_id } = result.rows[0];
 
-    // Generate new access token
+    // Rotate: issue new token, delete old hash
+    const newRefreshToken = generateRefreshToken(user_id, device_id);
+
+    await query('DELETE FROM refresh_tokens WHERE token = $1', [tokenHash]);
+    await query(
+      `INSERT INTO refresh_tokens (user_id, token, device_id, expires_at) VALUES ($1, $2, $3, $4)`,
+      [user_id, hashToken(newRefreshToken), device_id || null, tokenExpiresAt()]
+    );
+
     const accessToken = generateAccessToken(user_id, email);
 
-    res.json({ accessToken });
+    res.json({ accessToken, refreshToken: newRefreshToken });
   } catch (error) {
     console.error('Token refresh error:', error);
     res.status(403).json({ error: 'Invalid refresh token' });
@@ -189,8 +205,7 @@ router.post('/logout', async (req, res) => {
     const { refreshToken } = req.body;
 
     if (refreshToken) {
-      // Delete refresh token from database
-      await query('DELETE FROM refresh_tokens WHERE token = $1', [refreshToken]);
+      await query('DELETE FROM refresh_tokens WHERE token = $1', [hashToken(refreshToken)]);
     }
 
     res.json({ success: true });
@@ -200,7 +215,7 @@ router.post('/logout', async (req, res) => {
   }
 });
 
-// Get current user (requires authentication)
+// Get current user
 router.get('/me', authenticateToken, async (req, res) => {
   try {
     const result = await query(

@@ -25,6 +25,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('capture');
   const [showAreasSettings, setShowAreasSettings] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showConsole, setShowConsole] = useState(false);
 
   // Debug PWA install state
   useEffect(() => {
@@ -57,7 +58,7 @@ export default function Dashboard() {
       <PWAInstallPrompt />
       <OfflineIndicator />
       <HealthCheck />
-      <MobileConsole />
+      <MobileConsole isOpen={showConsole} onClose={() => setShowConsole(false)} />
       <div className="h-screen flex flex-col">
       {/* Header */}
       <header className="glass border-b border-white/10 px-4 py-2 sm:px-6 sm:py-3 flex-shrink-0">
@@ -128,6 +129,14 @@ export default function Dashboard() {
             >
               <span>🗂️</span>
               <span>Manage Areas</span>
+            </button>
+
+            <button
+              onClick={() => { setShowMenu(false); setShowConsole(true); }}
+              className="w-full text-left px-4 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 mb-2"
+            >
+              <span>🐛</span>
+              <span>Console</span>
             </button>
 
             <button

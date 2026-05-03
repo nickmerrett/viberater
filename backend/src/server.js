@@ -17,6 +17,7 @@ import syncRoutes from './routes/sync.js';
 import remindersRoutes from './routes/reminders.js';
 import captureRoutes from './routes/capture.js';
 import areasRoutes, { bootstrapAreas } from './routes/areas.js';
+import { query } from './config/database.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -27,36 +28,41 @@ const PORT = process.env.PORT || 3000;
 // Trust proxy - we're behind nginx
 app.set('trust proxy', 1);
 
-// Middleware
+// CORS - explicit origin required in production
+const corsOrigin = process.env.CORS_ORIGIN;
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || true, // Allow all origins in development
+  origin: corsOrigin || (process.env.NODE_ENV !== 'production' ? true : false),
   credentials: true
 }));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-// Rate limiting - more permissive for development
+const rateLimitHandler = (req, res) => {
+  res.status(429).json({ error: 'Too many requests, please try again later.' });
+};
+
+// General API rate limit
 const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 500, // Increased from 100
+  windowMs: 15 * 60 * 1000,
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 500,
   standardHeaders: true,
   legacyHeaders: false,
-  handler: (req, res) => {
-    res.status(429).json({
-      error: 'Too many requests',
-      message: 'Too many requests, please try again later.',
-      retryAfter: req.rateLimit.resetTime
-    });
-  },
-  // Skip in development
-  skip: (req) => process.env.NODE_ENV !== 'production'
+  handler: rateLimitHandler,
+  skip: () => process.env.NODE_ENV !== 'production',
 });
 
-// Only apply rate limiting in production
-if (process.env.NODE_ENV === 'production') {
-  app.use('/api/', limiter);
-}
+// Strict limit for auth endpoints — brute force protection
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler,
+  skip: () => process.env.NODE_ENV !== 'production',
+});
+
+app.use('/api/', limiter);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -68,7 +74,7 @@ app.get('/health', (req, res) => {
 });
 
 // API Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/ideas', ideasRoutes);
 app.use('/api/projects', projectsRoutes);
 app.use('/api/tasks', tasksRoutes);
@@ -97,6 +103,18 @@ app.use((err, req, res, next) => {
 const storageRoot = process.env.STORAGE_ROOT || './storage/projects';
 await fs.ensureDir(storageRoot);
 await fs.ensureDir('./logs');
+
+// Purge expired refresh tokens daily
+async function purgeExpiredTokens() {
+  try {
+    const result = await query('DELETE FROM refresh_tokens WHERE expires_at < NOW()');
+    if (result.rowCount > 0) console.log(`[auth] Purged ${result.rowCount} expired refresh tokens`);
+  } catch (e) {
+    console.error('[auth] Token purge failed:', e.message);
+  }
+}
+purgeExpiredTokens();
+setInterval(purgeExpiredTokens, 24 * 60 * 60 * 1000);
 
 // Start server
 app.listen(PORT, () => {

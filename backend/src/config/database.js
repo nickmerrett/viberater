@@ -186,29 +186,37 @@ export async function query(text, params = []) {
 
           // Remove RETURNING clause and get the columns
           const returningMatch = sqliteQuery.match(/RETURNING\s+(.+?)(?:;|$)/i);
-          const returningColumns = returningMatch ? returningMatch[1].trim() : '*';
+          const rawReturning = returningMatch ? returningMatch[1].trim() : '*';
+
+          // Whitelist column names — only allow word chars, underscores, and *
+          // Prevents any SQL injection if this adapter is ever called with dynamic SQL
+          const safeColumns = rawReturning === '*'
+            ? '*'
+            : rawReturning.split(',')
+                .map(c => c.trim())
+                .filter(c => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(c))
+                .join(', ') || '*';
+
           const queryWithoutReturning = sqliteQuery.replace(/RETURNING\s+.+?(?:;|$)/i, '');
+
+          // Whitelist table name — only allow word chars (same as \w+ but explicit)
+          const rawTable = queryWithoutReturning.match(/INSERT\s+INTO\s+(\w+)/i)?.[1] ?? '';
+          const tableName = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(rawTable) ? rawTable : null;
 
           const info = db.prepare(queryWithoutReturning).run(...sqliteParams);
 
           // Fetch the inserted/updated row
           let rows = [];
-          if (info.lastInsertRowid || sqliteParams[0]) {
-            // For INSERT, get the last inserted row
-            const tableName = queryWithoutReturning.match(/INSERT\s+INTO\s+(\w+)/i)?.[1];
-            if (tableName) {
+          if (tableName && (info.lastInsertRowid || sqliteParams[0])) {
               // If we generated a UUID, use it to fetch the row
               if (isInsert && sqliteParams[0]) {
-                rows = db.prepare(`SELECT ${returningColumns} FROM ${tableName} WHERE id = ?`).all(sqliteParams[0]);
+                rows = db.prepare(`SELECT ${safeColumns} FROM ${tableName} WHERE id = ?`).all(sqliteParams[0]);
               } else if (info.lastInsertRowid) {
-                rows = db.prepare(`SELECT ${returningColumns} FROM ${tableName} WHERE rowid = ?`).all(info.lastInsertRowid);
+                rows = db.prepare(`SELECT ${safeColumns} FROM ${tableName} WHERE rowid = ?`).all(info.lastInsertRowid);
               }
-              // Parse the returned rows
               rows = rows.map(row => parseRow(row));
-            }
           } else {
-            // For UPDATE/DELETE, we can't easily get the affected rows in SQLite
-            // Return empty rows array with changes count
+            // UPDATE/DELETE without RETURNING, or unsafe table name (should never happen)
             rows = [];
           }
 

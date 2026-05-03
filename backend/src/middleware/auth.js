@@ -47,7 +47,7 @@ export function generateRefreshToken(userId, deviceId) {
   return jwt.sign(
     { userId, deviceId, type: 'refresh' },
     JWT_SECRET,
-    { expiresIn: process.env.JWT_REFRESH_EXPIRY || '7d' }
+    { expiresIn: process.env.JWT_REFRESH_EXPIRY || '30d' }
   );
 }
 

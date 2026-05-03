@@ -118,6 +118,9 @@ class APIClient {
 
       const data = await response.json();
       localStorage.setItem('viberater_access_token', data.accessToken);
+      if (data.refreshToken) {
+        localStorage.setItem('viberater_refresh_token', data.refreshToken);
+      }
       return true;
     } catch (error) {
       return false;

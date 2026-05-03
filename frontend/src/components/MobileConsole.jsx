@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react';
 
-export default function MobileConsole() {
+export default function MobileConsole({ isOpen, onClose }) {
   const [logs, setLogs] = useState([]);
-  const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    // Capture console.log
     const originalLog = console.log;
     console.log = (...args) => {
       originalLog(...args);
@@ -16,7 +14,6 @@ export default function MobileConsole() {
       }]);
     };
 
-    // Capture console.error
     const originalError = console.error;
     console.error = (...args) => {
       originalError(...args);
@@ -33,17 +30,7 @@ export default function MobileConsole() {
     };
   }, []);
 
-  if (!isOpen) {
-    return (
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-4 z-50 w-12 h-12 rounded-full bg-purple-600 text-white shadow-lg flex items-center justify-center"
-        style={{ touchAction: 'manipulation' }}
-      >
-        🐛
-      </button>
-    );
-  }
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/90 flex flex-col">
@@ -57,7 +44,7 @@ export default function MobileConsole() {
             Clear
           </button>
           <button
-            onClick={() => setIsOpen(false)}
+            onClick={onClose}
             className="px-3 py-1 bg-white/10 rounded text-sm"
           >
             Close
