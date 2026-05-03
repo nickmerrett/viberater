@@ -5,6 +5,9 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
+# Install build tools for native modules (e.g. multer/sharp)
+RUN apk add --no-cache python3 make g++
+
 # Install dependencies
 RUN npm install
 
@@ -12,7 +15,7 @@ RUN npm install
 COPY . .
 
 # Create directories and set permissions for arbitrary UID (OpenShift)
-RUN mkdir -p storage/projects logs && \
+RUN mkdir -p storage/projects storage/attachments logs && \
     chown -R 1001:0 /app && \
     chmod -R g+rwX /app
 

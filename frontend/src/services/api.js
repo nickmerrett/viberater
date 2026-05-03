@@ -379,6 +379,38 @@ class APIClient {
     return this.request(`/reminders/${id}`, { method: 'DELETE' });
   }
 
+  // Attachments endpoints
+  async getAttachments(ideaId) {
+    return this.request(`/attachments/idea/${ideaId}`);
+  }
+
+  async uploadAttachment(ideaId, file) {
+    const token = localStorage.getItem('viberater_access_token');
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await fetch(`${this.baseURL}/attachments/upload/${ideaId}`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: 'Upload failed' }));
+      throw new Error(err.error || 'Upload failed');
+    }
+    return response.json();
+  }
+
+  async addLinkAttachment(ideaId, linkData) {
+    return this.request(`/attachments/link/${ideaId}`, {
+      method: 'POST',
+      body: JSON.stringify(linkData),
+    });
+  }
+
+  async deleteAttachment(id) {
+    return this.request(`/attachments/${id}`, { method: 'DELETE' });
+  }
+
   async suggestReminder(context) {
     return this.request('/ai/chat', {
       method: 'POST',

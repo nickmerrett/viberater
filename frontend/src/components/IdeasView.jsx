@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useDataStore } from '../store/useDataStore';
+import { api } from '../services/api';
 import AIChat from './AIChat';
 import BrainstormChat from './BrainstormChat';
 import PromoteChat from './PromoteChat';
@@ -7,6 +8,8 @@ import DesignDocument from './DesignDocument';
 import AreaBadge from './AreaBadge';
 import AreaSelect from './AreaSelect';
 import SplitIdeaModal from './SplitIdeaModal';
+import AttachmentUpload from './AttachmentUpload';
+import AttachmentList from './AttachmentList';
 
 export default function IdeasView({ activeArea = null }) {
   const { ideas, fetchIdeas, createIdea, promoteIdea, deleteIdea, updateIdea, loading } = useDataStore();
@@ -25,6 +28,7 @@ export default function IdeasView({ activeArea = null }) {
   const [showIdeation, setShowIdeation] = useState(false);
   const [promotingIdea, setPromotingIdea] = useState(null);
   const [splittingIdea, setSplittingIdea] = useState(null);
+  const [attachments, setAttachments] = useState({});
   const [isListening, setIsListening] = useState(false);
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
   const mediaRecorderRef = useRef(null);
@@ -281,6 +285,19 @@ export default function IdeasView({ activeArea = null }) {
     } catch (error) {
       alert('Failed to archive idea');
     }
+  };
+
+  const loadAttachments = async (ideaId) => {
+    if (attachments[ideaId]) return;
+    try {
+      const data = await api.getAttachments(ideaId);
+      setAttachments(prev => ({ ...prev, [ideaId]: data.attachments }));
+    } catch {}
+  };
+
+  const openIdea = (idea) => {
+    setViewingIdea(idea);
+    loadAttachments(idea.id);
   };
 
   const handleSplit = async (original, partA, partB) => {
@@ -606,7 +623,7 @@ export default function IdeasView({ activeArea = null }) {
 
                   <div className="flex gap-1.5 flex-wrap">
                     <button
-                      onClick={() => setViewingIdea(idea)}
+                      onClick={() => openIdea(idea)}
                       className="px-2 py-0.5 text-xs rounded-lg glass hover:bg-blue-500/20 hover:text-blue-400 transition-all"
                     >
                       📖 View
@@ -1135,6 +1152,34 @@ export default function IdeasView({ activeArea = null }) {
                         </option>
                       ))}
                   </select>
+                </div>
+              </div>
+
+              {/* Attachments */}
+              <div className="glass rounded-xl p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <span>📎</span> Attachments
+                </h3>
+                <div className="space-y-4">
+                  <AttachmentList
+                    attachments={attachments[viewingIdea.id]}
+                    onDelete={async (id) => {
+                      await api.deleteAttachment(id);
+                      setAttachments(prev => ({
+                        ...prev,
+                        [viewingIdea.id]: prev[viewingIdea.id].filter(a => a.id !== id),
+                      }));
+                    }}
+                  />
+                  <AttachmentUpload
+                    ideaId={viewingIdea.id}
+                    onUploaded={(attachment) => {
+                      setAttachments(prev => ({
+                        ...prev,
+                        [viewingIdea.id]: [...(prev[viewingIdea.id] || []), attachment],
+                      }));
+                    }}
+                  />
                 </div>
               </div>
             </div>

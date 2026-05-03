@@ -17,6 +17,7 @@ import syncRoutes from './routes/sync.js';
 import remindersRoutes from './routes/reminders.js';
 import captureRoutes from './routes/capture.js';
 import areasRoutes, { bootstrapAreas } from './routes/areas.js';
+import attachmentsRoutes from './routes/attachments.js';
 import { query } from './config/database.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -84,6 +85,7 @@ app.use('/api/sync', syncRoutes);
 app.use('/api/reminders', remindersRoutes);
 app.use('/api/capture', captureRoutes);
 app.use('/api/areas', areasRoutes);
+app.use('/api/attachments', attachmentsRoutes);
 
 // 404 handler
 app.use((req, res) => {
