@@ -1,5 +1,6 @@
--- Columns share_token, sharing_enabled, unread_comment_count already added
--- in partial run — just create the tables and indexes.
+ALTER TABLE ideas ADD COLUMN share_token VARCHAR(36);
+ALTER TABLE ideas ADD COLUMN sharing_enabled INTEGER DEFAULT 0;
+ALTER TABLE ideas ADD COLUMN unread_comment_count INTEGER DEFAULT 0;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ideas_share_token ON ideas(share_token);
 
