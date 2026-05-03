@@ -218,7 +218,7 @@ class Database {
     const queueItem = {
       ...operation,
       timestamp: Date.now(),
-      synced: false
+      synced: 0
     };
     return this.put(STORES.SYNC_QUEUE, queueItem);
   }
@@ -229,7 +229,7 @@ class Database {
     const index = store.index('synced');
 
     return new Promise((resolve, reject) => {
-      const request = index.getAll(false);
+      const request = index.getAll(0);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -238,7 +238,7 @@ class Database {
   async markSynced(id) {
     const item = await this.get(STORES.SYNC_QUEUE, id);
     if (item) {
-      item.synced = true;
+      item.synced = 1;
       await this.put(STORES.SYNC_QUEUE, item);
     }
   }

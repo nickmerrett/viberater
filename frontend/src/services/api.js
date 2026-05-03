@@ -6,6 +6,7 @@ const API_URL = import.meta.env.VITE_API_URL ||
 class APIClient {
   constructor() {
     this.baseURL = API_URL;
+    this._refreshPromise = null;
     console.log('[API] Base URL:', this.baseURL);
     console.log('[API] Environment:', {
       hostname: window.location.hostname,
@@ -92,6 +93,17 @@ class APIClient {
   }
 
   async refreshToken() {
+    // Lock: if a refresh is already in flight, share it instead of firing a second one
+    if (this._refreshPromise) return this._refreshPromise;
+
+    this._refreshPromise = this._doRefresh().finally(() => {
+      this._refreshPromise = null;
+    });
+
+    return this._refreshPromise;
+  }
+
+  async _doRefresh() {
     const refreshToken = localStorage.getItem('viberater_refresh_token');
     if (!refreshToken) return false;
 
