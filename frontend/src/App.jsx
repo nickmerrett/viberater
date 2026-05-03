@@ -4,6 +4,7 @@ import { useAuthStore } from './store/useAuthStore';
 import { useDataStore } from './store/useDataStore';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import SharedIdea from './pages/SharedIdea';
 import ErrorBoundary from './components/ErrorBoundary';
 
 function ProtectedRoute({ children }) {
@@ -31,6 +32,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/share/:token" element={<SharedIdea />} />
           <Route
             path="/"
             element={

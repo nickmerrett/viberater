@@ -379,6 +379,51 @@ class APIClient {
     return this.request(`/reminders/${id}`, { method: 'DELETE' });
   }
 
+  // Share endpoints
+  async getSharedIdea(token) {
+    return fetch(`${this.baseURL}/share/${token}`).then(r => r.json());
+  }
+
+  async reactToSharedIdea(token, reaction) {
+    return fetch(`${this.baseURL}/share/${token}/react`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reaction }),
+    }).then(r => r.json());
+  }
+
+  async commentOnSharedIdea(token, author_name, content) {
+    return fetch(`${this.baseURL}/share/${token}/comment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ author_name, content }),
+    }).then(r => r.json());
+  }
+
+  async toggleSharing(ideaId, enabled) {
+    return this.request(`/share/manage/${ideaId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ enabled }),
+    });
+  }
+
+  async getIdeaComments(ideaId) {
+    return this.request(`/share/manage/${ideaId}/comments`);
+  }
+
+  async replyToComment(ideaId, content) {
+    return this.request(`/share/manage/${ideaId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  async deleteComment(ideaId, commentId) {
+    return this.request(`/share/manage/${ideaId}/comments/${commentId}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Attachments endpoints
   async getAttachments(ideaId) {
     return this.request(`/attachments/idea/${ideaId}`);

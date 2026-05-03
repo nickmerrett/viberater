@@ -10,6 +10,7 @@ import AreaSelect from './AreaSelect';
 import SplitIdeaModal from './SplitIdeaModal';
 import AttachmentUpload from './AttachmentUpload';
 import AttachmentList from './AttachmentList';
+import ShareToggle from './ShareToggle';
 
 export default function IdeasView({ activeArea = null }) {
   const { ideas, fetchIdeas, createIdea, promoteIdea, deleteIdea, updateIdea, loading } = useDataStore();
@@ -619,6 +620,11 @@ export default function IdeasView({ activeArea = null }) {
                         🔗 {(idea.parent_idea_id ? 1 : 0) + (idea.related_ideas?.length || 0)}
                       </span>
                     )}
+                    {idea.unread_comment_count > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs" title="New comments">
+                        💬 {idea.unread_comment_count}
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex gap-1.5 flex-wrap">
@@ -1182,6 +1188,14 @@ export default function IdeasView({ activeArea = null }) {
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Share */}
+            <div className="px-6 py-4 border-t border-white/10">
+              <ShareToggle
+                idea={viewingIdea}
+                onUpdate={(updated) => setViewingIdea(updated)}
+              />
             </div>
 
             {/* Footer Actions */}
