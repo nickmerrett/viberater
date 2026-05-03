@@ -14,6 +14,7 @@ import PWAInstallPrompt from '../components/PWAInstallPrompt';
 import OfflineIndicator from '../components/OfflineIndicator';
 import HealthCheck from '../components/HealthCheck';
 import MobileConsole from '../components/MobileConsole';
+import UpdatePrompt from '../components/UpdatePrompt';
 import { VERSION, BUILD_ID } from '../version';
 import { getSetting, setSetting } from '../services/settings';
 
@@ -60,6 +61,7 @@ export default function Dashboard() {
       <PWAInstallPrompt />
       <OfflineIndicator />
       <HealthCheck />
+      <UpdatePrompt />
       <MobileConsole isOpen={showConsole} onClose={() => setShowConsole(false)} />
       <div className="h-screen flex flex-col">
       {/* Header */}

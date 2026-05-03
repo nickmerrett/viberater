@@ -26,6 +26,11 @@ registerRoute(
   })
 );
 
+// Called by the update prompt to activate the waiting SW immediately
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
 // Background Sync: browser fires this when connectivity is restored,
 // even if the tab was closed. We just tell any open clients to run their
 // sync queue — auth tokens live in the page, not the SW.
