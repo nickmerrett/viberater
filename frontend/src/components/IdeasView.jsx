@@ -6,6 +6,7 @@ import PromoteChat from './PromoteChat';
 import DesignDocument from './DesignDocument';
 import AreaBadge from './AreaBadge';
 import AreaSelect from './AreaSelect';
+import SplitIdeaModal from './SplitIdeaModal';
 
 export default function IdeasView({ activeArea = null }) {
   const { ideas, fetchIdeas, createIdea, promoteIdea, deleteIdea, updateIdea, loading } = useDataStore();
@@ -23,6 +24,7 @@ export default function IdeasView({ activeArea = null }) {
   const [ideatingFromIdea, setIdeatingFromIdea] = useState(null);
   const [showIdeation, setShowIdeation] = useState(false);
   const [promotingIdea, setPromotingIdea] = useState(null);
+  const [splittingIdea, setSplittingIdea] = useState(null);
   const [isListening, setIsListening] = useState(false);
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
   const mediaRecorderRef = useRef(null);
@@ -279,6 +281,19 @@ export default function IdeasView({ activeArea = null }) {
     } catch (error) {
       alert('Failed to archive idea');
     }
+  };
+
+  const handleSplit = async (original, partA, partB) => {
+    const shared = {
+      tags: original.tags || [],
+      area_id: original.area_id || null,
+      excitement: original.excitement,
+      complexity: original.complexity,
+      vibe: original.vibe || [],
+    };
+    await createIdea({ title: partA.title, summary: partA.summary, ...shared });
+    await createIdea({ title: partB.title, summary: partB.summary, ...shared });
+    await updateIdea(original.id, { archived: true });
   };
 
   const toggleTag = (tag) => {
@@ -612,6 +627,13 @@ export default function IdeasView({ activeArea = null }) {
                               className="px-2 py-0.5 text-xs rounded-lg glass hover:bg-accent/20 hover:text-accent transition-all"
                             >
                               🤖 {idea.status === 'refined' ? 'Continue' : 'Refine'}
+                            </button>
+                            <button
+                              onClick={() => setSplittingIdea(idea)}
+                              className="px-2 py-0.5 text-xs rounded-lg glass hover:bg-yellow-500/20 hover:text-yellow-400 transition-all"
+                              title="Split into two ideas"
+                            >
+                              ✂️ Split
                             </button>
                             <button
                               onClick={() => handlePromote(idea.id)}
@@ -1178,12 +1200,20 @@ export default function IdeasView({ activeArea = null }) {
       )}
 
       {/* Promote Chat Modal - AI-assisted project planning */}
+      {splittingIdea && (
+        <SplitIdeaModal
+          idea={splittingIdea}
+          onSplit={handleSplit}
+          onClose={() => setSplittingIdea(null)}
+        />
+      )}
+
       {promotingIdea && (
         <PromoteChat
           idea={promotingIdea}
           onClose={() => {
             setPromotingIdea(null);
-            fetchIdeas(); // Refresh to show updated idea status
+            fetchIdeas();
           }}
           onPromote={handlePromoteWithPlan}
         />

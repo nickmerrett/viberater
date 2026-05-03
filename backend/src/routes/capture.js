@@ -49,25 +49,38 @@ FLOW:
 4. Before saving, ask "any obvious next steps?" — one question, not a form
 5. Once you have next steps (or they say none), output the CAPTURE block
 
+MULTIPLE IDEAS IN ONE MESSAGE:
+Users often string ideas together in a single message. Watch for transition signals:
+- Additive: "also", "oh and", "another thing", "one more", "and another idea", "plus"
+- Collective: "we should", "we could also", "and we need to"
+- New thought: "actually", "while I'm at it", "on a different note", "separately"
+- Lists: numbered or bulleted items, or sentences separated by "—" or "..."
+
+When you spot multiple distinct ideas, treat each separately:
+- Acknowledge all of them briefly in your reply
+- Emit one CAPTURE block per idea (multiple blocks in the same response is fine)
+- Only ask a follow-up for the most interesting/underdeveloped one, not all of them
+- Cross-reference ideas against each other and against RECENT IDEAS — note if something connects
+
 AREAS AVAILABLE: ${areaList}
 
 RECENT IDEAS (for cross-referencing):
 ${ideaList}
 
 CAPTURE FORMAT:
-When ready to save, end your message with this exact format on its own line:
+When ready to save an idea, emit this on its own line (one per idea):
 CAPTURE:{"title":"...","summary":"...","area":"...","tags":["..."],"next_steps":["step 1","step 2"],"excitement":7,"complexity":"weekend","vibe":["creative","practical"]}
 
-FIELD GUIDANCE (infer from the conversation, don't ask):
+FIELD GUIDANCE (infer from context, don't ask):
 - excitement: 1-10 based on how animated/enthusiastic the user seems. Casual mention = 5, clearly excited = 8-9, life-changing = 10
 - complexity: one of "afternoon", "weekend", "week", "month", "months" — based on scope described
 - vibe: 1-3 mood/feel words that capture the nature of the idea (e.g. "creative", "practical", "ambitious", "relaxing", "technical", "personal", "fun")
 - next_steps: short actionable strings, empty array [] if none mentioned
 
-Everything before the CAPTURE line is shown to the user. The CAPTURE line is stripped silently.
+Everything before CAPTURE lines is shown to the user. CAPTURE lines are stripped silently.
 
 If the user is just chatting or asking something (not capturing an idea), respond naturally with no CAPTURE block.
-After a capture: acknowledge briefly and stay in the conversation naturally.`;
+After captures: acknowledge briefly ("got both of those") and stay in the conversation naturally.`;
 }
 
 // Get conversation history
@@ -287,12 +300,13 @@ router.post('/stream', async (req, res) => {
           : null;
 
         const ideaResult = await query(
-          `INSERT INTO ideas (user_id, title, summary, tags, notes, vibe, excitement, complexity, capture_message_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+          `INSERT INTO ideas (user_id, title, summary, tags, notes, vibe, excitement, complexity, area_id, capture_message_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
           [userId, capture.title, capture.summary || null,
            JSON.stringify(capture.tags || []), nextSteps,
            JSON.stringify(capture.vibe || []), capture.excitement || null,
-           capture.complexity || null, assistantMsg.rows[0].id]
+           capture.complexity || null, await resolveAreaId(userId, capture.area),
+           assistantMsg.rows[0].id]
         );
         savedIdeas.push(ideaResult.rows[0]);
       } catch (e) {

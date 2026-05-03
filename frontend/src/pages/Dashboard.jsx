@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { useDataStore } from '../store/useDataStore';
@@ -15,6 +15,7 @@ import OfflineIndicator from '../components/OfflineIndicator';
 import HealthCheck from '../components/HealthCheck';
 import MobileConsole from '../components/MobileConsole';
 import { VERSION, BUILD_ID } from '../version';
+import { getSetting, setSetting } from '../services/settings';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -26,6 +27,7 @@ export default function Dashboard() {
   const [showAreasSettings, setShowAreasSettings] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showConsole, setShowConsole] = useState(false);
+  const [batchGap, setBatchGap] = useState(() => getSetting('batchGapSeconds'));
 
   // Debug PWA install state
   useEffect(() => {
@@ -131,6 +133,25 @@ export default function Dashboard() {
               <span>Manage Areas</span>
             </button>
 
+            <div className="px-4 py-2 mb-2">
+              <div className="text-xs text-gray-500 mb-1.5">Offline batch gap</div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  max="60"
+                  value={batchGap}
+                  onChange={e => {
+                    const v = Math.max(1, Math.min(60, parseInt(e.target.value) || 5));
+                    setBatchGap(v);
+                    setSetting('batchGapSeconds', v);
+                  }}
+                  className="w-16 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-sm text-center outline-none focus:border-primary/40"
+                />
+                <span className="text-xs text-gray-400">seconds between messages</span>
+              </div>
+            </div>
+
             <button
               onClick={() => { setShowMenu(false); setShowConsole(true); }}
               className="w-full text-left px-4 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 mb-2"
@@ -175,7 +196,7 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-hidden relative">
-        {activeTab === 'capture' && <CaptureChat />}
+        {activeTab === 'capture' && <CaptureChat onNavigate={setActiveTab} />}
         {activeTab === 'ideas' && <IdeasView activeArea={activeArea} />}
         {activeTab === 'projects' && <ProjectsView activeArea={activeArea} />}
         {activeTab === 'reminders' && <RemindersView activeArea={activeArea} />}

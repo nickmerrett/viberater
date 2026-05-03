@@ -35,9 +35,23 @@ class SyncService {
   async queueOperation(operation) {
     await db.addToSyncQueue(operation);
 
-    // Try to sync immediately if online
     if (this.isOnline()) {
       this.sync();
+    } else {
+      // Register Background Sync so the browser triggers sync when
+      // connectivity returns, even if the tab is closed (Chrome/Android)
+      this._registerBackgroundSync();
+    }
+  }
+
+  async _registerBackgroundSync() {
+    try {
+      if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        const registration = await navigator.serviceWorker.ready;
+        await registration.sync.register('viberater-sync');
+      }
+    } catch (e) {
+      // Background Sync not available — online event handler is the fallback
     }
   }
 
@@ -193,16 +207,22 @@ class SyncService {
 
   // Initialize sync on app start
   init() {
-    // Listen for online event
+    // Sync when tab comes back online
     window.addEventListener('online', () => {
       console.log('Back online - syncing...');
       this.sync();
     });
 
-    // Listen for offline event
-    window.addEventListener('offline', () => {
-      console.log('Gone offline - operations will be queued');
-    });
+    // Listen for Background Sync messages from the service worker
+    // (fires when connectivity restored while tab was closed)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data?.type === 'BACKGROUND_SYNC') {
+          console.log('Background sync triggered by service worker');
+          this.sync();
+        }
+      });
+    }
 
     // Try to pull data if online
     if (this.isOnline()) {
