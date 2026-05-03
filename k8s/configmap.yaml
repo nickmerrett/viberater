@@ -12,7 +12,7 @@ data:
   BACKEND_URL: "viberater-backend-service:80"
   CORS_ORIGIN: "https://viberater.apps.homeserv.merrett.lan"
   DEFAULT_AI_PROVIDER: "claude"
-  MODEL_PRIMARY: "claude-4-5-sonnet-20240620"
+  MODEL_PRIMARY: "claude-sonnet-4-5"
   RATE_LIMIT_WINDOW_MS: "900000"
   RATE_LIMIT_MAX_REQUESTS: "100"
   JWT_ACCESS_EXPIRY: "15m"

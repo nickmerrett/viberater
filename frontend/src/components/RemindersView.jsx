@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useReminderNotifications } from '../hooks/useReminderNotifications';
+import AreaBadge from './AreaBadge';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -12,7 +13,7 @@ function dueBadge(due_date) {
   return { label: due_date, cls: 'bg-white/5 text-gray-400 border-white/10' };
 }
 
-export default function RemindersView() {
+export default function RemindersView({ activeArea = null }) {
   const [reminders, setReminders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState('');
@@ -112,8 +113,8 @@ export default function RemindersView() {
     }
   }
 
-  const active = reminders.filter(r => !r.completed);
-  const completed = reminders.filter(r => r.completed);
+  const active = reminders.filter(r => !r.completed && (!activeArea || r.area_id === activeArea));
+  const completed = reminders.filter(r => r.completed && (!activeArea || r.area_id === activeArea));
 
   return (
     <div className="h-full overflow-y-auto p-4 md:p-6 max-w-2xl mx-auto">
@@ -303,6 +304,7 @@ function ReminderRow({ reminder: r, editId, editData, onToggle, onDelete, onEdit
             {badge.label}
           </span>
         )}
+        {r.area_id && <AreaBadge areaId={r.area_id} className="mt-1" />}
       </div>
 
       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">

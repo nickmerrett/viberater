@@ -3,9 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { useDataStore } from '../store/useDataStore';
 import { usePWAInstall } from '../hooks/usePWAInstall';
+import CaptureChat from '../components/CaptureChat';
 import IdeasView from '../components/IdeasView';
 import ProjectsView from '../components/ProjectsView';
 import RemindersView from '../components/RemindersView';
+import AreaFilter from '../components/AreaFilter';
+import AreasSettings from '../components/AreasSettings';
+import { useAreaStore } from '../store/useAreaStore';
 import PWAInstallPrompt from '../components/PWAInstallPrompt';
 import OfflineIndicator from '../components/OfflineIndicator';
 import HealthCheck from '../components/HealthCheck';
@@ -15,14 +19,21 @@ import { VERSION, BUILD_ID } from '../version';
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
+  const fetchAreas = useAreaStore(s => s.fetch);
+  const activeArea = useAreaStore(s => s.activeArea);
   const { install, canInstall, isInstalled } = usePWAInstall();
-  const [activeTab, setActiveTab] = useState('ideas');
+  const [activeTab, setActiveTab] = useState('capture');
+  const [showAreasSettings, setShowAreasSettings] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
   // Debug PWA install state
   useEffect(() => {
     console.log('[Dashboard] PWA Install State:', { canInstall, isInstalled });
   }, [canInstall, isInstalled]);
+
+  useEffect(() => {
+    fetchAreas();
+  }, []);
 
   const handleLogout = async () => {
     await logout();
@@ -35,6 +46,7 @@ export default function Dashboard() {
   };
 
   const tabs = [
+    { id: 'capture', label: '💬 Capture' },
     { id: 'ideas', label: '💡 Ideas' },
     { id: 'projects', label: '🚀 Projects' },
     { id: 'reminders', label: '🔔 Reminders' },
@@ -111,6 +123,14 @@ export default function Dashboard() {
             )}
 
             <button
+              onClick={() => { setShowMenu(false); setShowAreasSettings(true); }}
+              className="w-full text-left px-4 py-2 rounded-lg hover:bg-white/5 transition-colors flex items-center gap-2 mb-2"
+            >
+              <span>🗂️</span>
+              <span>Manage Areas</span>
+            </button>
+
+            <button
               onClick={handleLogout}
               className="w-full text-left px-4 py-2 rounded-lg hover:bg-white/5 text-red-400 transition-colors"
             >
@@ -139,11 +159,17 @@ export default function Dashboard() {
         ))}
       </nav>
 
+      {showAreasSettings && <AreasSettings onClose={() => setShowAreasSettings(false)} />}
+
+      {/* Area Filter */}
+      <AreaFilter />
+
       {/* Main Content */}
       <main className="flex-1 overflow-hidden relative">
-        {activeTab === 'ideas' && <IdeasView />}
-        {activeTab === 'projects' && <ProjectsView />}
-        {activeTab === 'reminders' && <RemindersView />}
+        {activeTab === 'capture' && <CaptureChat />}
+        {activeTab === 'ideas' && <IdeasView activeArea={activeArea} />}
+        {activeTab === 'projects' && <ProjectsView activeArea={activeArea} />}
+        {activeTab === 'reminders' && <RemindersView activeArea={activeArea} />}
 
         {/* Version Footer */}
         <div className="absolute bottom-2 left-4 text-xs text-gray-600 pointer-events-none">

@@ -7,6 +7,7 @@ import {
   verifyRefreshToken,
   authenticateToken
 } from '../middleware/auth.js';
+import { bootstrapAreas } from './areas.js';
 
 const router = express.Router();
 
@@ -58,6 +59,9 @@ router.post('/register', async (req, res) => {
        VALUES ($1, $2, $3)`,
       [user.id, refreshToken, expiresAt]
     );
+
+    // Bootstrap default areas for new user
+    await bootstrapAreas(user.id);
 
     res.status(201).json({
       user: {

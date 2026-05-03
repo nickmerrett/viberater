@@ -44,6 +44,85 @@ class AIService {
     }
   }
 
+  // Plain text chat — no JSON parsing, used for conversational capture
+  async chatRaw(messages, options = {}) {
+    const provider = options.provider || this.defaultProvider;
+    const opts = { ...options, maxTokens: 512 };
+
+    switch (provider) {
+      case 'claude':
+        return this.chatClaude(messages, opts);
+      case 'openai':
+        return this.chatOpenAI(messages, opts);
+      default:
+        return this.chatClaude(messages, opts);
+    }
+  }
+
+  // Streaming chat — calls onToken(text) for each chunk, returns full content
+  async streamRaw(messages, options = {}, onToken) {
+    const provider = options.provider || this.defaultProvider;
+
+    switch (provider) {
+      case 'claude':
+        return this.streamClaude(messages, options, onToken);
+      case 'openai':
+        return this.streamOpenAI(messages, options, onToken);
+      default:
+        return this.streamClaude(messages, options, onToken);
+    }
+  }
+
+  async streamClaude(messages, options = {}, onToken) {
+    if (!this.anthropic) throw new Error('Claude API key not configured');
+
+    const systemPrompt = options.systemPrompt || this.getDefaultSystemPrompt();
+    const model = options.model || process.env.MODEL_PRIMARY || 'claude-sonnet-4-5';
+    let fullContent = '';
+
+    const stream = this.anthropic.messages.stream({
+      model,
+      max_tokens: options.maxTokens || 512,
+      system: systemPrompt,
+      messages: messages.map(m => ({ role: m.role, content: m.content })),
+    });
+
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+        const text = event.delta.text;
+        fullContent += text;
+        onToken(text);
+      }
+    }
+
+    return { content: fullContent };
+  }
+
+  async streamOpenAI(messages, options = {}, onToken) {
+    if (!this.openai) throw new Error('OpenAI API key not configured');
+
+    const systemPrompt = options.systemPrompt || this.getDefaultSystemPrompt();
+    const model = options.model || 'gpt-4o';
+    let fullContent = '';
+
+    const stream = await this.openai.chat.completions.create({
+      model,
+      max_tokens: options.maxTokens || 512,
+      stream: true,
+      messages: [{ role: 'system', content: systemPrompt }, ...messages],
+    });
+
+    for await (const chunk of stream) {
+      const text = chunk.choices[0]?.delta?.content;
+      if (text) {
+        fullContent += text;
+        onToken(text);
+      }
+    }
+
+    return { content: fullContent };
+  }
+
   async chatClaude(messages, options = {}) {
     if (!this.anthropic) {
       throw new Error('Claude API key not configured');

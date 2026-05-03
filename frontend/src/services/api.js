@@ -269,6 +269,74 @@ class APIClient {
       body: JSON.stringify({ idea, ...options }),
     });
   }
+  // Areas endpoints
+  async getAreas() {
+    return this.request('/areas');
+  }
+
+  async createArea(data) {
+    return this.request('/areas', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateArea(id, data) {
+    return this.request(`/areas/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async deleteArea(id) {
+    return this.request(`/areas/${id}`, { method: 'DELETE' });
+  }
+
+  // Capture chat endpoints
+  async getCaptureMessages() {
+    return this.request('/capture/messages');
+  }
+
+  async sendCaptureMessage(content) {
+    return this.request('/capture/chat', {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  async streamCaptureMessage(content, onToken, onDone, onError) {
+    const token = localStorage.getItem('viberater_access_token');
+    const res = await fetch(`${this.baseURL}/capture/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ content }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Request failed' }));
+      onError(err.error || 'Request failed');
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const event = JSON.parse(line.slice(6));
+          if (event.type === 'token') onToken(event.text);
+          else if (event.type === 'done') onDone(event);
+          else if (event.type === 'error') onError(event.message);
+        } catch { /* skip malformed */ }
+      }
+    }
+  }
+
   // Reminders endpoints
   async getReminders() {
     return this.request('/reminders');

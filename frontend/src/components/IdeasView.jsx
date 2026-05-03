@@ -4,8 +4,10 @@ import AIChat from './AIChat';
 import BrainstormChat from './BrainstormChat';
 import PromoteChat from './PromoteChat';
 import DesignDocument from './DesignDocument';
+import AreaBadge from './AreaBadge';
+import AreaSelect from './AreaSelect';
 
-export default function IdeasView() {
+export default function IdeasView({ activeArea = null }) {
   const { ideas, fetchIdeas, createIdea, promoteIdea, deleteIdea, updateIdea, loading } = useDataStore();
   const [filter, setFilter] = useState('active');
   const [searchQuery, setSearchQuery] = useState('');
@@ -34,7 +36,8 @@ export default function IdeasView() {
     tags: [],
     excitement: 5,
     complexity: 'weekend',
-    techStack: []
+    techStack: [],
+    area_id: null,
   });
 
   useEffect(() => {
@@ -165,6 +168,9 @@ export default function IdeasView() {
       const hasAllTags = selectedTags.every(tag => idea.tags?.includes(tag));
       if (!hasAllTags) return false;
     }
+
+    // Area filter
+    if (activeArea && idea.area_id !== activeArea) return false;
 
     return true;
   });
@@ -527,6 +533,7 @@ export default function IdeasView() {
                         ✨ AI Refined
                       </span>
                     )}
+                    {idea.area_id && <AreaBadge areaId={idea.area_id} className="mt-1" />}
                   </div>
                   <span className="text-lg">{idea.status === 'promoted-to-project' ? '🚀' : '💡'}</span>
                 </div>
@@ -736,6 +743,15 @@ export default function IdeasView() {
                   <option value="month">Month</option>
                   <option value="months">Months</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Area</label>
+                <AreaSelect
+                  value={newIdea.area_id}
+                  onChange={v => setNewIdea({ ...newIdea, area_id: v })}
+                  className="w-full"
+                />
               </div>
 
               <div>

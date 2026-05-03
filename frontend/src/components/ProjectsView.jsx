@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useDataStore } from '../store/useDataStore';
 import { api } from '../services/api';
 import ProjectChat from './ProjectChat';
+import AreaBadge from './AreaBadge';
 
-export default function ProjectsView() {
+export default function ProjectsView({ activeArea = null }) {
   const { projects, tasks, fetchProjects, fetchProjectTasks, createTask, completeTask, updateTask, deleteTask, deleteProject, demoteProject, updateProject, loading } = useDataStore();
   const [filter, setFilter] = useState('all');
   const [selectedProject, setSelectedProject] = useState(null);
@@ -35,6 +36,7 @@ export default function ProjectsView() {
     if (filter === 'active') return project.status === 'in-progress';
     if (filter === 'done') return project.status === 'completed';
     if (filter === 'archived') return project.status === 'archived';
+    if (activeArea && project.area_id !== activeArea) return false;
     return true;
   });
 
@@ -605,8 +607,11 @@ export default function ProjectsView() {
                 className="card cursor-pointer"
               >
                 <div className="flex items-start justify-between mb-3">
-                  <h3 className="text-xl font-semibold flex-1">{project.title}</h3>
-                  <span className="text-2xl">🚀</span>
+                  <div className="flex-1">
+                    <h3 className="text-base sm:text-xl font-semibold">{project.title}</h3>
+                    {project.area_id && <AreaBadge areaId={project.area_id} className="mt-1" />}
+                  </div>
+                  <span className="text-lg">🚀</span>
                 </div>
 
                 <p className="text-gray-400 mb-4">{project.description}</p>
