@@ -154,13 +154,15 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <button
-              onClick={() => { setShowMenu(false); setShowConsole(true); }}
-              className="w-full text-left px-4 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 mb-2"
-            >
-              <span>🐛</span>
-              <span>Console</span>
-            </button>
+            {import.meta.env.DEV && (
+              <button
+                onClick={() => { setShowMenu(false); setShowConsole(true); }}
+                className="w-full text-left px-4 py-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors flex items-center gap-2 mb-2"
+              >
+                <span>🐛</span>
+                <span>Console</span>
+              </button>
+            )}
 
             <button
               onClick={handleLogout}
