@@ -267,9 +267,15 @@ export default function CaptureChat({ onNavigate }) {
     const content = input.trim();
     if (!content || sending) return;
 
-    // Command autocomplete selection takes priority
+    // Command autocomplete: exact no-args match → execute; otherwise fill
     if (cmdSuggestions.length > 0) {
-      selectSuggestion(cmdSuggestions[cmdIndex]);
+      const selected = cmdSuggestions[cmdIndex];
+      if (content === selected.cmd && !selected.args) {
+        setCmdSuggestions([]);
+        await runCommand(content);
+        return;
+      }
+      selectSuggestion(selected);
       return;
     }
 
