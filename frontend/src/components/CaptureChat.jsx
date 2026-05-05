@@ -129,7 +129,7 @@ export default function CaptureChat({ onNavigate }) {
         try {
           addSystemMsg('⏳ Creating reminder…');
           const suggestion = await api.suggestReminder(rest);
-          const raw = suggestion?.message?.content || suggestion?.content || '';
+          const raw = suggestion?.message || '';
           const match = raw.match(/\{[\s\S]*\}/);
           const parsed = match ? JSON.parse(match[0]) : { title: rest, due_date: null };
           await api.createReminder({ title: parsed.title || rest, due_date: parsed.due_date || null, note: parsed.note || '' });
