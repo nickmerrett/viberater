@@ -129,7 +129,7 @@ export default function CaptureChat({ onNavigate }) {
         try {
           addSystemMsg('⏳ Creating reminder…');
           const suggestion = await api.suggestReminder(rest);
-          const raw = suggestion?.message?.content || suggestion?.content || '';
+          const raw = suggestion?.message || '';
           const match = raw.match(/\{[\s\S]*\}/);
           const parsed = match ? JSON.parse(match[0]) : { title: rest, due_date: null };
           await api.createReminder({ title: parsed.title || rest, due_date: parsed.due_date || null, note: parsed.note || '' });
@@ -267,9 +267,15 @@ export default function CaptureChat({ onNavigate }) {
     const content = input.trim();
     if (!content || sending) return;
 
-    // Command autocomplete selection takes priority
+    // Command autocomplete: exact no-args match → execute; otherwise fill
     if (cmdSuggestions.length > 0) {
-      selectSuggestion(cmdSuggestions[cmdIndex]);
+      const selected = cmdSuggestions[cmdIndex];
+      if (content === selected.cmd && !selected.args) {
+        setCmdSuggestions([]);
+        await runCommand(content);
+        return;
+      }
+      selectSuggestion(selected);
       return;
     }
 
