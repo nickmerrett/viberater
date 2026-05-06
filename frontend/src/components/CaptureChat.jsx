@@ -271,6 +271,7 @@ export default function CaptureChat({ onNavigate }) {
     if (cmdSuggestions.length > 0) {
       const selected = cmdSuggestions[cmdIndex];
       if (content === selected.cmd && !selected.args) {
+        setInput('');
         setCmdSuggestions([]);
         await runCommand(content);
         return;

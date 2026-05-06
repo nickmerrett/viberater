@@ -113,3 +113,85 @@ describe('APIClient convenience methods', () => {
     expect(config.method).toBe('POST');
   });
 });
+
+describe('APIClient.suggestReminder', () => {
+  it('POSTs to /ai/chat with the context as a user message', async () => {
+    mockFetch.mockReturnValueOnce(
+      jsonResponse({ message: '{"title":"Call dentist","due_date":null}', questions: [] })
+    );
+    const result = await api.suggestReminder('call the dentist next week');
+    const [url, config] = mockFetch.mock.calls[0];
+    const body = JSON.parse(config.body);
+    expect(url).toContain('/ai/chat');
+    expect(config.method).toBe('POST');
+    expect(body.messages[0]).toMatchObject({ role: 'user', content: 'call the dentist next week' });
+    // message is a plain string on the response object
+    expect(typeof result.message).toBe('string');
+  });
+});
+
+describe('APIClient.streamCaptureMessage', () => {
+  function makeSSEStream(chunks) {
+    const encoder = new TextEncoder();
+    return new ReadableStream({
+      start(controller) {
+        for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+        controller.close();
+      },
+    });
+  }
+
+  it('calls onError when the response is not ok', async () => {
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({ ok: false, json: () => Promise.resolve({ error: 'Unauthorized' }) })
+    );
+    const onToken = vi.fn();
+    const onDone = vi.fn();
+    const onError = vi.fn();
+    await api.streamCaptureMessage('hello', onToken, onDone, onError);
+    expect(onError).toHaveBeenCalledWith('Unauthorized');
+    expect(onToken).not.toHaveBeenCalled();
+  });
+
+  it('streams tokens and fires onDone with captured ideas', async () => {
+    const sseLines =
+      'data: {"type":"token","text":"Hello"}\n\n' +
+      'data: {"type":"token","text":" world"}\n\n' +
+      'data: {"type":"done","messageId":"msg-1","captured":[]}\n\n';
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({ ok: true, body: makeSSEStream([sseLines]) })
+    );
+    const onToken = vi.fn();
+    const onDone = vi.fn();
+    const onError = vi.fn();
+    await api.streamCaptureMessage('test', onToken, onDone, onError);
+    expect(onToken).toHaveBeenCalledWith('Hello');
+    expect(onToken).toHaveBeenCalledWith(' world');
+    expect(onDone).toHaveBeenCalledWith(expect.objectContaining({ messageId: 'msg-1' }));
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it('handles tokens split across chunks', async () => {
+    // Simulate nginx/proxy delivering the SSE line in two separate TCP chunks
+    const chunk1 = 'data: {"type":"tok';
+    const chunk2 = 'en","text":"hi"}\n\ndata: {"type":"done","messageId":"m2","captured":[]}\n\n';
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({ ok: true, body: makeSSEStream([chunk1, chunk2]) })
+    );
+    const onToken = vi.fn();
+    const onDone = vi.fn();
+    await api.streamCaptureMessage('test', onToken, onDone, vi.fn());
+    expect(onToken).toHaveBeenCalledWith('hi');
+    expect(onDone).toHaveBeenCalledWith(expect.objectContaining({ messageId: 'm2' }));
+  });
+
+  it('sends the auth token in the Authorization header', async () => {
+    localStorage.setItem('viberater_access_token', 'stream-token');
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({ ok: false, json: () => Promise.resolve({ error: 'x' }) })
+    );
+    await api.streamCaptureMessage('hi', vi.fn(), vi.fn(), vi.fn());
+    const [, config] = mockFetch.mock.calls[0];
+    expect(config.headers['Authorization']).toBe('Bearer stream-token');
+  });
+});
