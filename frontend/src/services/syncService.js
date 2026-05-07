@@ -177,6 +177,8 @@ class SyncService {
     if (!this.isOnline()) {
       throw new Error('Cannot pull from server while offline');
     }
+    // Skip silently if unauthenticated — avoids 401 redirect on public pages
+    if (!localStorage.getItem('viberater_access_token')) return;
 
     try {
       // Fetch all data
@@ -207,8 +209,9 @@ class SyncService {
 
   // Initialize sync on app start
   init() {
-    // Sync when tab comes back online
+    // Sync when tab comes back online (only if authenticated)
     window.addEventListener('online', () => {
+      if (!localStorage.getItem('viberater_access_token')) return;
       console.log('Back online - syncing...');
       this.sync();
     });
