@@ -155,20 +155,12 @@ router.post('/chat', async (req, res) => {
     const aiResponse = await aiService.chatRaw(aiMessages, { systemPrompt });
     const fullContent = aiResponse.content;
 
-    // Parse out CAPTURE block(s) if present
-    const captureRegex = /^CAPTURE:(\{.+\})\s*$/gm;
+    // Parse and strip CAPTURE blocks — robust to multiline JSON
     const captures = [];
-    let match;
-    while ((match = captureRegex.exec(fullContent)) !== null) {
-      try {
-        captures.push(JSON.parse(match[1]));
-      } catch {
-        // malformed capture block, skip
-      }
-    }
-
-    // Clean response shown to user (strip CAPTURE lines)
-    const displayContent = fullContent.replace(/^CAPTURE:\{.+\}\s*$/gm, '').trim();
+    const displayContent = fullContent.replace(/CAPTURE:(\{[\s\S]*?\})(?=\n|$)/gm, (_, json) => {
+      try { captures.push(JSON.parse(json)); } catch { /* skip malformed */ }
+      return '';
+    }).trim();
 
     // Save assistant message
     const assistantMsg = await query(
@@ -275,15 +267,13 @@ router.post('/stream', async (req, res) => {
       send({ type: 'token', text: token });
     });
 
-    // Parse CAPTURE blocks from full response
-    const captureRegex = /^CAPTURE:(\{.+\})\s*$/gm;
+    // Parse CAPTURE blocks — handle both single-line and multiline JSON
+    // by counting braces rather than relying on regex `.` not matching newlines.
     const captures = [];
-    let match;
-    while ((match = captureRegex.exec(fullContent)) !== null) {
-      try { captures.push(JSON.parse(match[1])); } catch { /* skip malformed */ }
-    }
-
-    const displayContent = fullContent.replace(/^CAPTURE:\{.+\}\s*$/gm, '').trim();
+    const displayContent = fullContent.replace(/CAPTURE:(\{[\s\S]*?\})(?=\n|$)/gm, (_, json) => {
+      try { captures.push(JSON.parse(json)); } catch { /* skip malformed */ }
+      return '';
+    }).trim();
 
     // Save assistant message
     const assistantMsg = await query(
@@ -314,11 +304,13 @@ router.post('/stream', async (req, res) => {
       }
     }
 
-    // Final event
+    // Final event — include clean content so frontend can strip CAPTURE blocks
+    // that were already streamed as raw tokens
     send({
       type: 'done',
       messageId: assistantMsg.rows[0].id,
       created_at: assistantMsg.rows[0].created_at,
+      content: displayContent,
       captured: savedIdeas,
     });
 

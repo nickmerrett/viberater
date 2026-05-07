@@ -98,6 +98,14 @@ function parseRow(row) {
     if (key === 'archived' || key === 'ai_generated' || key === 'git_committed') {
       parsed[key] = Boolean(value);
     }
+
+    // Normalize SQLite datetime strings ("YYYY-MM-DD HH:MM:SS", no timezone) to
+    // ISO 8601 UTC ("YYYY-MM-DDTHH:MM:SSZ") so browsers don't misinterpret them
+    // as local time, which breaks chronological sorting when mixed with client
+    // timestamps from new Date().toISOString().
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
+      parsed[key] = value.replace(' ', 'T') + 'Z';
+    }
   }
 
   return parsed;
