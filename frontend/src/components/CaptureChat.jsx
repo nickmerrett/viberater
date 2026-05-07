@@ -70,11 +70,17 @@ export default function CaptureChat({ onNavigate }) {
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
   const syncingRef = useRef(false);
+  const initialScrollDone = useRef(false);
 
   useEffect(() => { loadHistory(); }, []);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!messages.length && !pendingMessages.length) return;
+    // Jump instantly on first load so history doesn't flash at the top;
+    // smooth-scroll for every subsequent message.
+    const behavior = initialScrollDone.current ? 'smooth' : 'instant';
+    initialScrollDone.current = true;
+    bottomRef.current?.scrollIntoView({ behavior });
   }, [messages, pendingMessages]);
 
   // When coming back online, flush the pending queue
