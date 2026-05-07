@@ -299,18 +299,19 @@ class APIClient {
   }
 
   // Capture chat endpoints
-  async getCaptureMessages() {
-    return this.request('/capture/messages');
+  async getCaptureMessages(sessionId) {
+    const qs = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : '';
+    return this.request(`/capture/messages${qs}`);
   }
 
-  async sendCaptureMessage(content) {
+  async sendCaptureMessage(content, sessionId) {
     return this.request('/capture/chat', {
       method: 'POST',
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, session_id: sessionId }),
     });
   }
 
-  async streamCaptureMessage(content, onToken, onDone, onError) {
+  async streamCaptureMessage(content, sessionId, onToken, onDone, onError) {
     const token = localStorage.getItem('viberater_access_token');
     const res = await fetch(`${this.baseURL}/capture/stream`, {
       method: 'POST',
@@ -318,7 +319,7 @@ class APIClient {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, session_id: sessionId }),
     });
 
     if (!res.ok) {

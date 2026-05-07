@@ -60,15 +60,18 @@ When you spot multiple distinct ideas, treat each separately:
 - Acknowledge all of them briefly in your reply
 - Emit one CAPTURE block per idea (multiple blocks in the same response is fine)
 - Only ask a follow-up for the most interesting/underdeveloped one, not all of them
-- Cross-reference ideas against each other and against RECENT IDEAS — note if something connects
+- Cross-reference ideas against each other and against ALREADY SAVED IDEAS — note if something connects
+
+NO DUPLICATE CAPTURES — CRITICAL RULE:
+The "ALREADY SAVED IDEAS" list below contains ideas that are ALREADY in the user's library. NEVER emit a CAPTURE block for any idea that appears in that list, or for any idea you already captured earlier in this same conversation. Each idea should be captured exactly once. If the user mentions a saved idea again (to refine, discuss, or act on it), acknowledge it and engage — but do NOT re-capture it.
 
 AREAS AVAILABLE: ${areaList}
 
-RECENT IDEAS (for cross-referencing):
+ALREADY SAVED IDEAS (do NOT re-capture these):
 ${ideaList}
 
 CAPTURE FORMAT:
-When ready to save an idea, emit this on its own line (one per idea):
+When ready to save a NEW idea, emit this on its own line (one per idea):
 CAPTURE:{"title":"...","summary":"...","area":"...","tags":["..."],"next_steps":["step 1","step 2"],"excitement":7,"complexity":"weekend","vibe":["creative","practical"]}
 
 FIELD GUIDANCE (infer from context, don't ask):
@@ -83,18 +86,29 @@ If the user is just chatting or asking something (not capturing an idea), respon
 After captures: acknowledge briefly ("got both of those") and stay in the conversation naturally.`;
 }
 
-// Get conversation history
+// Get conversation history — scoped to a session if session_id provided
 router.get('/messages', async (req, res) => {
   try {
+    const { session_id } = req.query;
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - RETENTION_DAYS);
 
-    const result = await query(
-      `SELECT id, role, content, created_at FROM capture_messages
-       WHERE user_id = $1 AND created_at > $2
-       ORDER BY created_at ASC`,
-      [req.user.userId, cutoff.toISOString()]
-    );
+    let result;
+    if (session_id) {
+      result = await query(
+        `SELECT id, role, content, created_at FROM capture_messages
+         WHERE user_id = $1 AND session_id = $2 AND created_at > $3
+         ORDER BY created_at ASC`,
+        [req.user.userId, session_id, cutoff.toISOString()]
+      );
+    } else {
+      result = await query(
+        `SELECT id, role, content, created_at FROM capture_messages
+         WHERE user_id = $1 AND created_at > $2
+         ORDER BY created_at ASC`,
+        [req.user.userId, cutoff.toISOString()]
+      );
+    }
 
     res.json({ messages: result.rows });
   } catch (error) {
@@ -106,28 +120,39 @@ router.get('/messages', async (req, res) => {
 // Send a message
 router.post('/chat', async (req, res) => {
   try {
-    const { content } = req.body;
+    const { content, session_id } = req.body;
     if (!content?.trim()) return res.status(400).json({ error: 'Message content required' });
 
     const userId = req.user.userId;
 
     // Save user message
-    const userMsg = await query(
-      `INSERT INTO capture_messages (user_id, role, content) VALUES ($1, 'user', $2) RETURNING *`,
-      [userId, content.trim()]
-    );
+    const userMsg = session_id
+      ? await query(
+          `INSERT INTO capture_messages (user_id, role, content, session_id) VALUES ($1, 'user', $2, $3) RETURNING *`,
+          [userId, content.trim(), session_id]
+        )
+      : await query(
+          `INSERT INTO capture_messages (user_id, role, content) VALUES ($1, 'user', $2) RETURNING *`,
+          [userId, content.trim()]
+        );
 
-    // Get recent history for AI context
+    // Get recent history for AI context (scoped to session if provided)
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - RETENTION_DAYS);
 
-    const history = await query(
-      `SELECT role, content FROM capture_messages
-       WHERE user_id = $1 AND created_at > $2
-       ORDER BY created_at ASC
-       LIMIT $3`,
-      [userId, cutoff.toISOString(), CONTEXT_MESSAGES]
-    );
+    const history = session_id
+      ? await query(
+          `SELECT role, content FROM capture_messages
+           WHERE user_id = $1 AND session_id = $2 AND created_at > $3
+           ORDER BY created_at ASC LIMIT $4`,
+          [userId, session_id, cutoff.toISOString(), CONTEXT_MESSAGES]
+        )
+      : await query(
+          `SELECT role, content FROM capture_messages
+           WHERE user_id = $1 AND created_at > $2
+           ORDER BY created_at ASC LIMIT $3`,
+          [userId, cutoff.toISOString(), CONTEXT_MESSAGES]
+        );
 
     // Get user's areas
     let areas = [];
@@ -143,13 +168,11 @@ router.post('/chat', async (req, res) => {
 
     // Get recent ideas for cross-reference
     const recentIdeas = await query(
-      `SELECT title, created_at FROM ideas WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10`,
+      `SELECT title, created_at FROM ideas WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
       [userId]
     );
 
     const systemPrompt = buildSystemPrompt(areas, recentIdeas.rows);
-
-    // Call AI with plain text response (not JSON)
     const aiMessages = history.rows.map(m => ({ role: m.role, content: m.content }));
 
     const aiResponse = await aiService.chatRaw(aiMessages, { systemPrompt });
@@ -163,10 +186,15 @@ router.post('/chat', async (req, res) => {
     }).trim();
 
     // Save assistant message
-    const assistantMsg = await query(
-      `INSERT INTO capture_messages (user_id, role, content) VALUES ($1, 'assistant', $2) RETURNING *`,
-      [userId, displayContent]
-    );
+    const assistantMsg = session_id
+      ? await query(
+          `INSERT INTO capture_messages (user_id, role, content, session_id) VALUES ($1, 'assistant', $2, $3) RETURNING *`,
+          [userId, displayContent, session_id]
+        )
+      : await query(
+          `INSERT INTO capture_messages (user_id, role, content) VALUES ($1, 'assistant', $2) RETURNING *`,
+          [userId, displayContent]
+        );
 
     // Save any captured ideas
     const savedIdeas = [];
@@ -215,7 +243,7 @@ router.post('/chat', async (req, res) => {
 
 // Streaming chat endpoint — SSE
 router.post('/stream', async (req, res) => {
-  const { content } = req.body;
+  const { content, session_id } = req.body;
   if (!content?.trim()) return res.status(400).json({ error: 'Message content required' });
 
   const userId = req.user.userId;
@@ -230,20 +258,34 @@ router.post('/stream', async (req, res) => {
 
   try {
     // Save user message
-    await query(
-      `INSERT INTO capture_messages (user_id, role, content) VALUES ($1, 'user', $2)`,
-      [userId, content.trim()]
-    );
+    if (session_id) {
+      await query(
+        `INSERT INTO capture_messages (user_id, role, content, session_id) VALUES ($1, 'user', $2, $3)`,
+        [userId, content.trim(), session_id]
+      );
+    } else {
+      await query(
+        `INSERT INTO capture_messages (user_id, role, content) VALUES ($1, 'user', $2)`,
+        [userId, content.trim()]
+      );
+    }
 
-    // Get history
+    // Get history (scoped to session if provided)
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - RETENTION_DAYS);
-    const history = await query(
-      `SELECT role, content FROM capture_messages
-       WHERE user_id = $1 AND created_at > $2
-       ORDER BY created_at ASC LIMIT $3`,
-      [userId, cutoff.toISOString(), CONTEXT_MESSAGES]
-    );
+    const history = session_id
+      ? await query(
+          `SELECT role, content FROM capture_messages
+           WHERE user_id = $1 AND session_id = $2 AND created_at > $3
+           ORDER BY created_at ASC LIMIT $4`,
+          [userId, session_id, cutoff.toISOString(), CONTEXT_MESSAGES]
+        )
+      : await query(
+          `SELECT role, content FROM capture_messages
+           WHERE user_id = $1 AND created_at > $2
+           ORDER BY created_at ASC LIMIT $3`,
+          [userId, cutoff.toISOString(), CONTEXT_MESSAGES]
+        );
 
     // Get areas and recent ideas for context
     let areas = [];
@@ -253,7 +295,7 @@ router.post('/stream', async (req, res) => {
     } catch { /* areas table may not exist yet */ }
 
     const recentIdeas = await query(
-      `SELECT title, created_at FROM ideas WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10`,
+      `SELECT title, created_at FROM ideas WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
       [userId]
     );
 
@@ -268,7 +310,6 @@ router.post('/stream', async (req, res) => {
     });
 
     // Parse CAPTURE blocks — handle both single-line and multiline JSON
-    // by counting braces rather than relying on regex `.` not matching newlines.
     const captures = [];
     const displayContent = fullContent.replace(/CAPTURE:(\{[\s\S]*?\})(?=\n|$)/gm, (_, json) => {
       try { captures.push(JSON.parse(json)); } catch { /* skip malformed */ }
@@ -276,10 +317,15 @@ router.post('/stream', async (req, res) => {
     }).trim();
 
     // Save assistant message
-    const assistantMsg = await query(
-      `INSERT INTO capture_messages (user_id, role, content) VALUES ($1, 'assistant', $2) RETURNING *`,
-      [userId, displayContent]
-    );
+    const assistantMsg = session_id
+      ? await query(
+          `INSERT INTO capture_messages (user_id, role, content, session_id) VALUES ($1, 'assistant', $2, $3) RETURNING *`,
+          [userId, displayContent, session_id]
+        )
+      : await query(
+          `INSERT INTO capture_messages (user_id, role, content) VALUES ($1, 'assistant', $2) RETURNING *`,
+          [userId, displayContent]
+        );
 
     // Save captured ideas
     const savedIdeas = [];
