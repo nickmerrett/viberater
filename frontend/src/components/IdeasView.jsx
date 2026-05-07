@@ -29,6 +29,7 @@ export default function IdeasView({ activeArea = null }) {
   const [showIdeation, setShowIdeation] = useState(false);
   const [promotingIdea, setPromotingIdea] = useState(null);
   const [splittingIdea, setSplittingIdea] = useState(null);
+  const [deletingIdea, setDeletingIdea] = useState(null);
   const [attachments, setAttachments] = useState({});
   const [isListening, setIsListening] = useState(false);
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
@@ -285,6 +286,17 @@ export default function IdeasView({ activeArea = null }) {
       await updateIdea(id, { archived });
     } catch (error) {
       alert('Failed to archive idea');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deletingIdea) return;
+    try {
+      await deleteIdea(deletingIdea.id);
+      if (viewingIdea?.id === deletingIdea.id) setViewingIdea(null);
+      setDeletingIdea(null);
+    } catch (error) {
+      alert('Failed to delete idea');
     }
   };
 
@@ -678,14 +690,13 @@ export default function IdeasView({ activeArea = null }) {
                     >
                       {idea.archived ? '📤 Unarchive' : '📦 Archive'}
                     </button>
-                    {idea.archived && (
-                      <button
-                        onClick={() => deleteIdea(idea.id)}
-                        className="px-3 py-1 rounded-lg glass hover:bg-red-500/20 hover:text-red-400 transition-all"
-                      >
-                        Delete
-                      </button>
-                    )}
+                    <button
+                      onClick={() => setDeletingIdea(idea)}
+                      className="px-2 py-0.5 text-xs rounded-lg glass hover:bg-red-500/20 hover:text-red-400 transition-all"
+                      title="Delete idea"
+                    >
+                      🗑️ Delete
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1215,6 +1226,13 @@ export default function IdeasView({ activeArea = null }) {
                 >
                   📥 Export MD
                 </button>
+                <button
+                  onClick={() => setDeletingIdea(viewingIdea)}
+                  className="glass px-4 py-2 rounded-lg hover:bg-red-500/20 hover:text-red-400 transition-all flex items-center gap-2"
+                  title="Delete idea"
+                >
+                  🗑️ Delete
+                </button>
                 <div className="flex-1"></div>
                 <button
                   onClick={() => {
@@ -1276,6 +1294,48 @@ export default function IdeasView({ activeArea = null }) {
           }}
           onPromote={handlePromoteWithPlan}
         />
+      )}
+
+      {/* Delete confirmation modal */}
+      {deletingIdea && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-6 z-[60]">
+          <div className="glass rounded-2xl p-6 max-w-sm w-full border border-red-500/20">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-400">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                  <path d="M10 11v6M14 11v6" />
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-semibold text-white">Delete idea?</h3>
+                <p className="text-xs text-gray-400 mt-0.5">This cannot be undone</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-300 mb-6 pl-13">
+              "<span className="text-white font-medium">{deletingIdea.title}</span>" will be permanently removed.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeletingIdea(null)}
+                className="flex-1 glass px-4 py-2 rounded-xl text-sm hover:bg-white/5 transition-all"
+                autoFocus
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex-1 bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 hover:text-red-200 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
