@@ -248,7 +248,7 @@ export default function CaptureChat({ onNavigate }) {
         (done) => {
           setMessages(prev => prev.map(m =>
             m.id === 'streaming'
-              ? { ...m, id: done.messageId, created_at: done.created_at }
+              ? { ...m, id: done.messageId, created_at: done.created_at, content: done.content ?? m.content }
               : m
           ));
           if (done.captured?.length) {
