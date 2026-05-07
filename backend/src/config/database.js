@@ -157,14 +157,16 @@ export async function query(text, params = []) {
               // Add UUID to params at the beginning
               sqliteParams.unshift(uuid);
 
-              // Rebuild query with id column
+              // Rebuild query with id column — preserve original values so
+              // literals like 'user', 'image', true stay as-is and aren't
+              // replaced with extra ? placeholders.
               const valuesMatch = sqliteQuery.match(/VALUES\s*\(([^)]+)\)/i);
               if (valuesMatch) {
                 const newColumns = columns.join(', ');
-                const valuesPlaceholders = columns.map(() => '?').join(', ');
+                const originalValues = valuesMatch[1];
                 sqliteQuery = sqliteQuery.replace(
                   /INSERT\s+INTO\s+\w+\s*\([^)]+\)\s*VALUES\s*\([^)]+\)/i,
-                  `INSERT INTO ${tableName} (${newColumns}) VALUES (${valuesPlaceholders})`
+                  `INSERT INTO ${tableName} (${newColumns}) VALUES (?, ${originalValues})`
                 );
               }
             }
