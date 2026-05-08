@@ -14,7 +14,7 @@ function ProtectedRoute({ children }) {
 
 function App() {
   useEffect(() => {
-    // Initialize IndexedDB and sync service
+    if (window.location.pathname.startsWith('/share')) return;
     const init = async () => {
       try {
         console.log('[App] Initializing database...');
