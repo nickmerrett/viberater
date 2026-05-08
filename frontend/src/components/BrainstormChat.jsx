@@ -117,7 +117,7 @@ One or two sentences max. No lists, no enthusiasm, no emojis.`;
     try {
       const response = await api.chatWithAI(
         [{ role: 'user', content: userPrompt }],
-        { provider, systemPrompt, temperature: 0.7, maxTokens: 300 }
+        { provider, systemPrompt }
       );
 
       setMessages([
