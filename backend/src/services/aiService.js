@@ -134,7 +134,8 @@ class AIService {
     try {
       const response = await this.anthropic.messages.create({
         model,
-        max_tokens: 2048,
+        max_tokens: options.maxTokens || 2048,
+        ...(options.temperature !== undefined && { temperature: options.temperature }),
         system: systemPrompt,
         messages: messages.map(msg => ({
           role: msg.role,
@@ -172,7 +173,8 @@ class AIService {
           { role: 'system', content: systemPrompt },
           ...messages
         ],
-        max_tokens: 2048,
+        max_tokens: options.maxTokens || 2048,
+        ...(options.temperature !== undefined && { temperature: options.temperature }),
       });
 
       return {

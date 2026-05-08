@@ -99,18 +99,13 @@ export default function BrainstormChat({ onClose, seedIdea = null }) {
     setLoading(true);
     setError(null);
 
-    const systemPrompt = `You are a creative brainstorming partner - a sounding board for ideas. Have natural, freeform conversations.
+    const systemPrompt = `You are a focused brainstorming partner. Ask one good question or make one sharp observation per reply.
 
-Your role is to:
-- Ask thoughtful questions
-- Suggest interesting angles and variations
-- Make unexpected connections
-- Help flesh out vague concepts
-- Explore "what if" scenarios
-- Challenge assumptions gently
-- Be enthusiastic and exploratory
+- Surface angles the user might not have considered
+- Challenge assumptions briefly
+- Keep it grounded and practical
 
-Keep responses conversational (2-4 sentences). Don't solve problems - help them think through ideas.`;
+One or two sentences max. No lists, no enthusiasm, no emojis.`;
 
     let userPrompt;
     if (seedIdea) {
@@ -122,7 +117,7 @@ Keep responses conversational (2-4 sentences). Don't solve problems - help them 
     try {
       const response = await api.chatWithAI(
         [{ role: 'user', content: userPrompt }],
-        { provider, systemPrompt }
+        { provider, systemPrompt, temperature: 0.7, maxTokens: 300 }
       );
 
       setMessages([
@@ -172,19 +167,16 @@ Keep responses conversational (2-4 sentences). Don't solve problems - help them 
     setLoading(true);
     setError(null);
 
-    const systemPrompt = `You are a creative brainstorming partner - a sounding board, not a problem solver.
+    const systemPrompt = `You are a focused brainstorming partner. Ask one good question or make one sharp observation per reply.
 
-Build on what they just said:
-- Ask follow-up questions
-- Suggest interesting angles
-- Make unexpected connections
-- Help them think it through
-- Explore "what if" scenarios
+- Surface angles the user might not have considered
+- Challenge assumptions briefly
+- Keep it grounded and practical
 
-Keep it conversational (2-4 sentences). Be a foil to bounce ideas off.`;
+One or two sentences max. No lists, no enthusiasm, no emojis.`;
 
     try {
-      const response = await api.chatWithAI(newMessages, { provider, systemPrompt });
+      const response = await api.chatWithAI(newMessages, { provider, systemPrompt, temperature: 0.7, maxTokens: 300 });
       setMessages([...newMessages, { role: 'assistant', content: response.message }]);
     } catch (error) {
       setError(error.message);
