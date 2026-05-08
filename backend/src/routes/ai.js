@@ -10,7 +10,7 @@ router.use(authenticateToken);
 // Chat endpoint for idea refinement
 router.post('/chat', async (req, res) => {
   try {
-    const { messages, provider, model, systemPrompt, temperature, maxTokens } = req.body;
+    const { messages, provider, model, systemPrompt } = req.body;
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'Messages array is required' });
@@ -29,9 +29,7 @@ router.post('/chat', async (req, res) => {
     const response = await aiService.chat(messages, {
       provider,
       model,
-      systemPrompt,
-      temperature,
-      maxTokens
+      systemPrompt
     });
 
     // Try to parse JSON response (strip markdown code fences if present)
