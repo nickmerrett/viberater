@@ -277,6 +277,16 @@ export default function IdeasView({ activeArea = null }) {
     );
   };
 
+  // Full-screen riff — replaces the list entirely
+  if (ideatingFromIdea || showIdeation) {
+    return (
+      <BrainstormChat
+        seedIdea={ideatingFromIdea}
+        onClose={() => { setIdeatingFromIdea(null); setShowIdeation(false); fetchIdeas(); }}
+      />
+    );
+  }
+
   // Full-screen idea detail — replaces the list entirely
   if (viewingIdea) {
     return (
@@ -287,7 +297,7 @@ export default function IdeasView({ activeArea = null }) {
           attachments={attachments[viewingIdea.id]}
           onBack={() => setViewingIdea(null)}
           onRefine={() => { setViewingIdea(null); setRefiningIdea(viewingIdea); }}
-          onRiff={() => { setViewingIdea(null); setIdeatingFromIdea(viewingIdea); }}
+          onRiff={() => setIdeatingFromIdea(viewingIdea)}
           onPromote={() => { setViewingIdea(null); setPromotingIdea(viewingIdea); }}
           onSplit={() => { setViewingIdea(null); setSplittingIdea(viewingIdea); }}
           onArchive={handleArchive}
@@ -336,9 +346,6 @@ export default function IdeasView({ activeArea = null }) {
         {/* Modals triggered from detail actions */}
         {refiningIdea && (
           <AIChat idea={refiningIdea} onClose={() => { setRefiningIdea(null); fetchIdeas(); }} />
-        )}
-        {ideatingFromIdea && (
-          <BrainstormChat seedIdea={ideatingFromIdea} onClose={() => { setIdeatingFromIdea(null); fetchIdeas(); }} />
         )}
         {splittingIdea && (
           <SplitIdeaModal idea={splittingIdea} onSplit={handleSplit} onClose={() => setSplittingIdea(null)} />
@@ -703,19 +710,9 @@ export default function IdeasView({ activeArea = null }) {
         </div>
       )}
 
-      {/* Brainstorm Chat Modal - Fresh brainstorm */}
-      {showIdeation && (
-        <BrainstormChat
-          onClose={() => { setShowIdeation(false); fetchIdeas(); }}
-        />
-      )}
-
       {/* Modals only used from the list (not from detail view) */}
       {refiningIdea && (
         <AIChat idea={refiningIdea} onClose={() => { setRefiningIdea(null); fetchIdeas(); }} />
-      )}
-      {ideatingFromIdea && (
-        <BrainstormChat seedIdea={ideatingFromIdea} onClose={() => { setIdeatingFromIdea(null); fetchIdeas(); }} />
       )}
       {splittingIdea && (
         <SplitIdeaModal idea={splittingIdea} onSplit={handleSplit} onClose={() => setSplittingIdea(null)} />
