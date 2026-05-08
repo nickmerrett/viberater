@@ -6,32 +6,33 @@ viberater is a full-stack PWA that helps you capture, refine, and manage project
 
 ## ✨ Features
 
-- 🎙️ **Voice Input** - Capture ideas by speaking naturally
-- 🤖 **AI Refinement** - Chat with AI to flesh out your ideas
-- 📋 **Project Management** - Promote ideas to tracked projects with tasks
-- 💾 **Offline-First PWA** - Works completely offline with local storage
-- 🔄 **Multi-Database** - Supports both SQLite (simple) and PostgreSQL (scalable)
-- 🐳 **Docker Ready** - One-command deployment
-- ☸️ **Kubernetes Ready** - Production-grade k8s configs included
-- 🔴 **OpenShift Ready** - Runs on OpenShift with Routes and strict security
+- 🎙️ **Voice Input** — Capture ideas by speaking naturally
+- 🤖 **AI Capture** — Chat with AI; it automatically extracts and saves ideas from the conversation
+- 💭 **Riff Mode** — Free-form brainstorm on a specific idea with full-screen AI chat
+- 🔬 **AI Refinement** — Deepen an idea with targeted AI conversation
+- ✂️ **Split Ideas** — Break one idea into two distinct directions
+- 🚀 **Promote to Project** — Convert an idea into a tracked project with AI-generated tasks
+- 🔗 **Idea Sharing** — Share any idea via a public link (no sign-in required for viewers)
+- 📎 **Attachments** — Attach files and audio recordings to ideas
+- 🗂️ **Areas** — Organise ideas into focus areas
+- 💬 **Chat Sessions** — Each conversation is isolated; start a New Chat to keep threads finite
+- 💾 **Offline-First PWA** — Works offline with IndexedDB; syncs when back online
+- 🔄 **Multi-Database** — Supports SQLite (default) and PostgreSQL
+- 🐳 **Docker Ready** — One-command deployment with Docker Compose
+- ☸️ **Kubernetes / OpenShift Ready** — Production-grade k8s configs with Tekton CI/CD pipeline
 
 ## 🚀 Quick Start
 
 ### Option 1: Docker Compose (Recommended)
 
 ```bash
-# Clone the repo
 git clone https://github.com/nickmerrett/viberater.git
 cd viberater
 
-# Copy environment variables
+# Copy and configure environment variables
 cp .env.example .env
+# Edit .env — add your AI API key and set a JWT_SECRET
 
-# Add your AI API keys to .env
-# CLAUDE_API_KEY=sk-ant-...
-# OPENAI_API_KEY=sk-...
-
-# Start everything (uses SQLite by default)
 docker compose up
 
 # Open http://localhost:8080
@@ -41,45 +42,36 @@ docker compose up
 
 ```bash
 # Backend
-cd viberater-backend
+cd backend
 npm install
 npm run migrate
-npm run dev
+npm run dev        # runs on http://localhost:3000
 
 # Frontend (separate terminal)
-cd viberater
+cd frontend
 npm install
-npm run dev
-
-# Open http://localhost:5173
+npm run dev        # runs on http://localhost:5173
 ```
 
 ## 📚 Documentation
 
-- **[User Guide](GUIDE.md)** - Complete installation and API reference
-- **[Technical Documentation](DOCS.md)** - Architecture, database, and deployment
-- **[OpenShift Guide](k8s/OPENSHIFT.md)** - Deploy to OpenShift with Routes
-- **[Kubernetes Guide](k8s/README.md)** - Deploy to any Kubernetes cluster
-- **[Project Status](PROJECT_STATUS.md)** - Current features and roadmap
+- **[User Guide](GUIDE.md)** — Installation and feature walkthrough
+- **[Technical Docs](DOCS.md)** — Architecture, database schema, and deployment
+- **[OpenShift Guide](k8s/OPENSHIFT.md)** — Deploy to OpenShift with Routes
+- **[Kubernetes Guide](k8s/README.md)** — Deploy to any Kubernetes cluster
 
 ## 🗄️ Database Options
 
-viberater supports both SQLite and PostgreSQL:
-
 **SQLite (Default)**
-- ✅ Zero configuration
-- ✅ Single file database
-- ✅ Perfect for personal use
-- ✅ Easy backups (just copy the file!)
+- Zero configuration
+- Single file — easy to back up
+- Perfect for personal use
 
 **PostgreSQL**
-- ✅ Better for teams
-- ✅ Horizontal scaling
-- ✅ Production-grade
+- Better for teams and horizontal scaling
+- Production-grade
 
-Switch between them by setting `DB_TYPE=sqlite` or `DB_TYPE=postgres` in your `.env` file.
-
-See [DATABASE.md](DATABASE.md) for migration instructions.
+Set `DB_TYPE=sqlite` or `DB_TYPE=postgres` in your `.env` file. See [DOCS.md](DOCS.md) for migration details.
 
 ## 🏗️ Tech Stack
 
@@ -87,82 +79,64 @@ See [DATABASE.md](DATABASE.md) for migration instructions.
 - React + Vite
 - Tailwind CSS
 - Zustand (state management)
-- Workbox (PWA/offline support)
+- Dexie / IndexedDB (offline storage)
+- Workbox (PWA / background sync)
 
 **Backend**
 - Node.js + Express
-- SQLite / PostgreSQL
+- SQLite (better-sqlite3) / PostgreSQL
 - JWT authentication
 - Claude & OpenAI integration
 
 **Infrastructure**
 - Docker & Docker Compose
-- Kubernetes (optional)
-- Nginx reverse proxy
+- Kubernetes / OpenShift
+- Nginx reverse proxy (gateway + frontend)
+- Tekton CI/CD pipeline (test → build → smoke → deploy)
 
 ## 🎯 Workflow
 
-1. **Capture** - Speak or type your idea
-2. **Refine** - Chat with AI to explore details
-3. **Design** - Generate MVP specs and architecture
-4. **Promote** - Convert to a tracked project
-5. **Execute** - Work through AI-generated tasks
-6. **Ship** - Track progress and completion
+1. **Capture** — Speak or type; AI extracts ideas automatically from the conversation
+2. **Riff** — Free-form brainstorm on an idea to explore new angles
+3. **Refine** — Focused AI chat to deepen a specific idea
+4. **Split** — Fork an idea into two separate directions when it grows
+5. **Promote** — Convert to a tracked project with AI-generated tasks
+6. **Share** — Send a public read-only link to anyone, no account needed
 
 ## 🔐 Environment Variables
-
-Create a `.env` file in the root directory:
 
 ```bash
 # Database
 DB_TYPE=sqlite
-SQLITE_DIR=./viberater-backend/storage
+SQLITE_DIR=./storage          # path for SQLite file
 
 # AI Providers
 CLAUDE_API_KEY=sk-ant-your-key-here
-OPENAI_API_KEY=sk-your-key-here
+OPENAI_API_KEY=sk-your-key-here     # optional
 
-# JWT
-JWT_SECRET=your-secret-key-min-32-chars
+# Auth
+JWT_SECRET=your-secret-key-minimum-32-chars
 
 # Optional
 DEFAULT_AI_PROVIDER=claude
-MODEL_PRIMARY=claude-3-5-sonnet-20240620
+MODEL_PRIMARY=claude-sonnet-4-5-20250929
 ```
 
 ## 📱 PWA Installation
 
-### Desktop (Chrome/Edge)
-1. Click the install icon in the address bar
-2. Or use the prompt that appears
+**Desktop (Chrome / Edge)** — click the install icon in the address bar
 
-### Mobile (iOS Safari)
-1. Tap the Share button
-2. Select "Add to Home Screen"
+**iOS Safari** — Share → Add to Home Screen
 
-### Mobile (Android Chrome)
-1. Tap the menu (⋮)
-2. Select "Add to Home Screen"
+**Android Chrome** — Menu (⋮) → Add to Home Screen
 
 ## 🤝 Contributing
 
-Contributions are welcome! This is a personal project but feel free to:
-- Open issues for bugs or feature requests
-- Submit pull requests
-- Share your ideas and use cases
+Contributions are welcome. Feel free to open issues for bugs or feature requests, or submit pull requests.
 
 ## 📄 License
 
 MIT
-
-## 🙏 Credits
-
-Built with:
-- [Claude](https://www.anthropic.com/claude) by Anthropic
-- [OpenAI](https://openai.com/) for Whisper transcription
-- [React](https://react.dev/)
-- [Vite](https://vitejs.dev/)
-- [Tailwind CSS](https://tailwindcss.com/)
 
 ---
 
