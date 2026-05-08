@@ -111,6 +111,33 @@ describe('CaptureChat slash command autocomplete', () => {
   });
 });
 
+describe('CaptureChat session management', () => {
+  it('renders the New Chat button', async () => {
+    await renderAndWait();
+    expect(screen.getByText(/new chat/i)).toBeInTheDocument();
+  });
+
+  it('clicking New Chat clears messages and generates a new session', async () => {
+    api.getCaptureMessages.mockResolvedValue({
+      messages: [{ id: '1', role: 'user', content: 'Hello', created_at: new Date().toISOString() }],
+    });
+    await renderAndWait();
+    // Message is visible
+    expect(screen.getByText('Hello')).toBeInTheDocument();
+
+    // Reset mock to return empty for new session
+    api.getCaptureMessages.mockResolvedValue({ messages: [] });
+
+    const newChatBtn = screen.getByText(/new chat/i);
+    fireEvent.click(newChatBtn);
+
+    await waitFor(() => {
+      // getCaptureMessages called again (for new session)
+      expect(api.getCaptureMessages).toHaveBeenCalledTimes(2);
+    });
+  });
+});
+
 describe('CaptureChat slash command execution', () => {
   it('/idea [title] saves an idea and confirms it', async () => {
     api.createIdea.mockResolvedValue({ id: '42', title: 'My Idea' });

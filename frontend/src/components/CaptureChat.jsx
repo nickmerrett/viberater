@@ -14,6 +14,16 @@ const COMMANDS = [
 ];
 
 const PENDING_KEY = 'viberater_pending_capture';
+const SESSION_KEY = 'viberater_chat_session_id';
+
+function getOrCreateSessionId() {
+  let id = localStorage.getItem(SESSION_KEY);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(SESSION_KEY, id);
+  }
+  return id;
+}
 
 function useOnlineStatus() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -60,6 +70,7 @@ function batchByTimeGap(messages, gapMs = 5000) {
 export default function CaptureChat({ onNavigate }) {
   const isOnline = useOnlineStatus();
   const { areas, setActive: setActiveArea } = useAreaStore();
+  const [sessionId, setSessionId] = useState(getOrCreateSessionId);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -72,7 +83,7 @@ export default function CaptureChat({ onNavigate }) {
   const syncingRef = useRef(false);
   const initialScrollDone = useRef(false);
 
-  useEffect(() => { loadHistory(); }, []);
+  useEffect(() => { loadHistory(sessionId); }, [sessionId]);
 
   useEffect(() => {
     if (!messages.length && !pendingMessages.length) return;
@@ -90,13 +101,23 @@ export default function CaptureChat({ onNavigate }) {
     }
   }, [isOnline]);
 
-  async function loadHistory() {
+  async function loadHistory(sid) {
     try {
-      const data = await api.getCaptureMessages();
+      const data = await api.getCaptureMessages(sid);
       setMessages(data.messages || []);
     } catch (e) {
       console.error('Failed to load capture history:', e);
     }
+  }
+
+  function newChat() {
+    const id = crypto.randomUUID();
+    localStorage.setItem(SESSION_KEY, id);
+    setSessionId(id);
+    setMessages([]);
+    setCapturedIdeas([]);
+    initialScrollDone.current = false;
+    inputRef.current?.focus();
   }
 
   function addSystemMsg(text) {
@@ -240,6 +261,7 @@ export default function CaptureChat({ onNavigate }) {
     await new Promise((resolve, reject) => {
       api.streamCaptureMessage(
         content,
+        sessionId,
         (token) => {
           setMessages(prev => prev.map(m =>
             m.id === 'streaming' ? { ...m, content: m.content + token } : m
@@ -340,6 +362,20 @@ export default function CaptureChat({ onNavigate }) {
 
   return (
     <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 flex-shrink-0">
+        <span className="text-xs text-gray-500 font-medium tracking-wide uppercase">Capture</span>
+        <button
+          onClick={newChat}
+          className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-white/5"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          New chat
+        </button>
+      </div>
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
         {allForDisplay.length === 0 && (

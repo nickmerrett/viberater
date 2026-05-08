@@ -148,7 +148,7 @@ describe('APIClient.streamCaptureMessage', () => {
     const onToken = vi.fn();
     const onDone = vi.fn();
     const onError = vi.fn();
-    await api.streamCaptureMessage('hello', onToken, onDone, onError);
+    await api.streamCaptureMessage('hello', 'session-1', onToken, onDone, onError);
     expect(onError).toHaveBeenCalledWith('Unauthorized');
     expect(onToken).not.toHaveBeenCalled();
   });
@@ -164,11 +164,20 @@ describe('APIClient.streamCaptureMessage', () => {
     const onToken = vi.fn();
     const onDone = vi.fn();
     const onError = vi.fn();
-    await api.streamCaptureMessage('test', onToken, onDone, onError);
+    await api.streamCaptureMessage('test', 'session-1', onToken, onDone, onError);
     expect(onToken).toHaveBeenCalledWith('Hello');
     expect(onToken).toHaveBeenCalledWith(' world');
     expect(onDone).toHaveBeenCalledWith(expect.objectContaining({ messageId: 'msg-1' }));
     expect(onError).not.toHaveBeenCalled();
+  });
+
+  it('sends session_id in the request body', async () => {
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({ ok: false, json: () => Promise.resolve({ error: 'x' }) })
+    );
+    await api.streamCaptureMessage('hello', 'my-session', vi.fn(), vi.fn(), vi.fn());
+    const [, config] = mockFetch.mock.calls[0];
+    expect(JSON.parse(config.body)).toMatchObject({ content: 'hello', session_id: 'my-session' });
   });
 
   it('handles tokens split across chunks', async () => {
@@ -180,7 +189,7 @@ describe('APIClient.streamCaptureMessage', () => {
     );
     const onToken = vi.fn();
     const onDone = vi.fn();
-    await api.streamCaptureMessage('test', onToken, onDone, vi.fn());
+    await api.streamCaptureMessage('test', null, onToken, onDone, vi.fn());
     expect(onToken).toHaveBeenCalledWith('hi');
     expect(onDone).toHaveBeenCalledWith(expect.objectContaining({ messageId: 'm2' }));
   });
@@ -190,7 +199,7 @@ describe('APIClient.streamCaptureMessage', () => {
     mockFetch.mockReturnValueOnce(
       Promise.resolve({ ok: false, json: () => Promise.resolve({ error: 'x' }) })
     );
-    await api.streamCaptureMessage('hi', vi.fn(), vi.fn(), vi.fn());
+    await api.streamCaptureMessage('hi', null, vi.fn(), vi.fn(), vi.fn());
     const [, config] = mockFetch.mock.calls[0];
     expect(config.headers['Authorization']).toBe('Bearer stream-token');
   });
