@@ -8,11 +8,10 @@ metadata:
     managed-by: kustomize
 spec:
   description: |
-    CI/CD pipeline for Viberater platform:
-    - Fetches git repository into viberater/ subdirectory (isolated from other pipelines on shared PVC)
-    - Builds backend and frontend Docker images
-    - Runs integration tests against built images
-    - Deploys to Kubernetes cluster
+    CI/CD pipeline for Viberater platform.
+    Flow: clone → test (parallel, fail-fast) → build (parallel) → smoke → deploy.
+    Unit tests run directly against source before any Docker build so failures
+    are caught quickly without wasting build time.
   params:
     - name: repo-url
       description: The git repository URL to clone from.
@@ -33,7 +32,9 @@ spec:
     - name: workspace
     - name: basic-auth
     - name: empty-dir
+
   tasks:
+    # ── 1. Clone ──────────────────────────────────────────────────────────────
     - name: fetch-repository
       taskRef:
         kind: Task
@@ -53,9 +54,68 @@ spec:
         - name: basic-auth
           workspace: basic-auth
 
-    - name: build-backend
+    # ── 2a. Backend unit tests (runs against source, before Docker build) ─────
+    - name: test-backend
       runAfter:
         - fetch-repository
+      workspaces:
+        - name: source
+          workspace: workspace
+      taskSpec:
+        workspaces:
+          - name: source
+        steps:
+          - name: install-and-test
+            image: node:20-alpine
+            workingDir: $(workspaces.source.path)/viberater/backend
+            env:
+              - name: NODE_ENV
+                value: test
+              - name: JWT_SECRET
+                value: test-secret-key-for-ci-min-32-chars!!
+              - name: DB_TYPE
+                value: sqlite
+              - name: SQLITE_DIR
+                value: /tmp
+            script: |
+              #!/bin/sh
+              set -e
+              echo "=== Installing build tools for native modules ==="
+              apk add --no-cache --quiet python3 make g++
+              echo "=== Installing dependencies ==="
+              npm ci
+              echo "=== Running backend tests ==="
+              npm test
+              echo "=== Backend tests passed ==="
+
+    # ── 2b. Frontend unit tests (runs against source, before Docker build) ────
+    - name: test-frontend
+      runAfter:
+        - fetch-repository
+      workspaces:
+        - name: source
+          workspace: workspace
+      taskSpec:
+        workspaces:
+          - name: source
+        steps:
+          - name: install-and-test
+            image: node:20-alpine
+            workingDir: $(workspaces.source.path)/viberater/frontend
+            script: |
+              #!/bin/sh
+              set -e
+              echo "=== Installing dependencies ==="
+              npm ci
+              echo "=== Running frontend tests ==="
+              npm test -- --run
+              echo "=== Frontend tests passed ==="
+
+    # ── 3a. Build backend image (only after both test steps pass) ─────────────
+    - name: build-backend
+      runAfter:
+        - test-backend
+        - test-frontend
       taskRef:
         kind: Task
         name: buildah
@@ -75,9 +135,11 @@ spec:
           workspace: workspace
           subPath: viberater
 
+    # ── 3b. Build frontend image (only after both test steps pass) ────────────
     - name: build-frontend
       runAfter:
-        - fetch-repository
+        - test-backend
+        - test-frontend
       taskRef:
         kind: Task
         name: buildah
@@ -97,44 +159,10 @@ spec:
           workspace: workspace
           subPath: viberater
 
-    - name: backend-integration-tests
-      runAfter:
-        - build-backend
-      params:
-        - name: backend-image
-          value: $(params.backend-image)
-      workspaces:
-        - name: source
-          workspace: workspace
-      taskSpec:
-        params:
-          - name: backend-image
-            type: string
-        workspaces:
-          - name: source
-        steps:
-          - name: run-integration-tests
-            image: $(params.backend-image)
-            env:
-              - name: NODE_ENV
-                value: test
-              - name: JWT_SECRET
-                value: test-secret-key-for-ci
-              - name: DB_TYPE
-                value: sqlite
-              - name: SQLITE_DIR
-                value: /tmp
-            workingDir: /app
-            script: |
-              #!/bin/sh
-              set -e
-              echo "=== Running backend integration tests ==="
-              npm test -- --passWithNoTests
-              echo "=== Backend integration tests passed ==="
-
+    # ── 4. Smoke tests (verify both images actually start) ────────────────────
     - name: smoke-tests
       runAfter:
-        - backend-integration-tests
+        - build-backend
         - build-frontend
       params:
         - name: backend-image
@@ -179,16 +207,14 @@ spec:
               #!/bin/sh
               set -e
               echo "=== Waiting for backend to be ready ==="
-
               for i in $(seq 1 30); do
                 if curl -s http://localhost:3000/health > /dev/null 2>&1; then
                   echo "Backend is healthy!"
                   break
                 fi
-                echo "Waiting for backend... ($i/30)"
+                echo "Waiting... ($i/30)"
                 sleep 2
               done
-
               curl -f http://localhost:3000/health || exit 1
               echo "=== Backend health check passed ==="
 
@@ -213,6 +239,7 @@ spec:
 
               echo "=== Smoke tests passed ==="
 
+    # ── 5. Deploy ─────────────────────────────────────────────────────────────
     - name: deploy
       runAfter:
         - smoke-tests
