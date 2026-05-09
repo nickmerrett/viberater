@@ -117,6 +117,36 @@ router.get('/messages', async (req, res) => {
   }
 });
 
+// List past capture sessions (distinct session_ids) with a preview
+router.get('/sessions', async (req, res) => {
+  try {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - RETENTION_DAYS);
+
+    const result = await query(
+      `SELECT
+         session_id,
+         MIN(created_at) AS started_at,
+         MAX(created_at) AS last_message_at,
+         COUNT(*) AS message_count,
+         (SELECT content FROM capture_messages m2
+          WHERE m2.session_id = m1.session_id AND m2.user_id = $1
+            AND m2.role = 'user'
+          ORDER BY m2.created_at ASC LIMIT 1) AS preview
+       FROM capture_messages m1
+       WHERE user_id = $1 AND session_id IS NOT NULL AND created_at > $2
+       GROUP BY session_id
+       ORDER BY last_message_at DESC`,
+      [req.user.userId, cutoff.toISOString()]
+    );
+
+    res.json({ sessions: result.rows });
+  } catch (error) {
+    console.error('Get capture sessions error:', error);
+    res.status(500).json({ error: 'Failed to fetch sessions' });
+  }
+});
+
 // Send a message
 router.post('/chat', async (req, res) => {
   try {
