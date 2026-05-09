@@ -31,6 +31,13 @@ const PORT = process.env.PORT || 3000;
 // Trust proxy - we're behind nginx
 app.set('trust proxy', 1);
 
+// Disable ETags — prevents browser returning stale 304 responses for API data
+app.disable('etag');
+app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
+
 // CORS - supports comma-separated list of allowed origins in CORS_ORIGIN
 const corsOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
