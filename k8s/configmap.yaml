@@ -16,6 +16,6 @@ data:
   NODE_ENV: production
   RATE_LIMIT_WINDOW_MS: '900000'
   JWT_ACCESS_EXPIRY: 15m
-  CORS_ORIGIN: 'https://viberater.apps.homeserv.merrett.lan'
+  CORS_ORIGIN: 'https://viberater.apps.homeserv.merrett.lan', 'https://viberater.nmerrett.net'
   SEARCH_PROVIDER: brave
 
