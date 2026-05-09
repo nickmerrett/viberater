@@ -5,7 +5,7 @@ metadata:
   namespace: viberater
 data:
   RATE_LIMIT_MAX_REQUESTS: '100'
-  BACKEND_URL: 'viberater-backend-service:3000'
+  BACKEND_URL: 'viberater-backend:3000'
   DATABASE_PORT: '5432'
   DEFAULT_AI_PROVIDER: claude
   DATABASE_HOST: postgres-service
