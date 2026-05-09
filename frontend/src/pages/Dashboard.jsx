@@ -206,8 +206,18 @@ export default function Dashboard() {
         {activeTab === 'projects' && <ProjectsView activeArea={activeArea} />}
         {activeTab === 'reminders' && <RemindersView activeArea={activeArea} />}
 
-        {/* Version Footer */}
-        <div className="absolute bottom-2 left-4 text-xs text-gray-600 pointer-events-none">
+        {/* Version Footer — tap 5× to open debug console */}
+        <div
+          className="absolute bottom-2 left-4 text-xs text-gray-600 select-none"
+          onClick={() => {
+            const now = Date.now();
+            const key = '_dbgTaps';
+            const taps = JSON.parse(sessionStorage.getItem(key) || '[]').filter(t => now - t < 2000);
+            taps.push(now);
+            sessionStorage.setItem(key, JSON.stringify(taps));
+            if (taps.length >= 5) { sessionStorage.removeItem(key); setShowConsole(true); }
+          }}
+        >
           v{VERSION} <span className="text-gray-700">• {BUILD_ID}</span>
         </div>
       </main>
