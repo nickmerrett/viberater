@@ -31,10 +31,14 @@ const PORT = process.env.PORT || 3000;
 // Trust proxy - we're behind nginx
 app.set('trust proxy', 1);
 
-// CORS - explicit origin required in production
-const corsOrigin = process.env.CORS_ORIGIN;
+// CORS - supports comma-separated list of allowed origins in CORS_ORIGIN
+const corsOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+  : null;
 app.use(cors({
-  origin: corsOrigin || (process.env.NODE_ENV !== 'production' ? true : false),
+  origin: corsOrigins
+    ? (corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins)
+    : (process.env.NODE_ENV !== 'production' ? true : false),
   credentials: true
 }));
 
