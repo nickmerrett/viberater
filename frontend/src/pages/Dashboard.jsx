@@ -208,7 +208,7 @@ export default function Dashboard() {
 
         {/* Version Footer — tap 5× to open debug console */}
         <div
-          className="absolute bottom-2 left-4 text-xs text-gray-600 select-none"
+          className="absolute bottom-0 left-0 p-3 text-xs text-gray-600 select-none cursor-default"
           onClick={() => {
             const now = Date.now();
             const key = '_dbgTaps';
@@ -218,7 +218,7 @@ export default function Dashboard() {
             if (taps.length >= 5) { sessionStorage.removeItem(key); setShowConsole(true); }
           }}
         >
-          v{VERSION} <span className="text-gray-700">• {BUILD_ID}</span>
+          v{VERSION} <span className="text-gray-700">• {BUILD_ID.slice(0, 7)}</span>
         </div>
       </main>
     </div>

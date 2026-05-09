@@ -157,6 +157,8 @@ spec:
           value: 'false'
         - name: STORAGE_DRIVER
           value: vfs
+        - name: BUILD_EXTRA_ARGS
+          value: --build-arg BUILD_ID=$(tasks.fetch-repository.results.commit)
       workspaces:
         - name: source
           workspace: workspace
