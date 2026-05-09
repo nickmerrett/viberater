@@ -26,6 +26,8 @@ export default function IdeaDetail({
   const [titleInput, setTitleInput] = useState(idea.title);
   const [editingTags, setEditingTags] = useState(false);
   const [tagsInput, setTagsInput] = useState((idea.tags || []).join(', '));
+  const [editing, setEditing] = useState(null); // 'summary' | 'notes' | 'excitement' | 'complexity' | 'vibe'
+  const [editInput, setEditInput] = useState('');
   const [localIdea, setLocalIdea] = useState(idea);
   const [conversationExpanded, setConversationExpanded] = useState(false);
 
@@ -53,6 +55,30 @@ export default function IdeaDetail({
       alert('Failed to update tags');
     }
   }
+
+  function startEditing(field) {
+    const val = field === 'vibe'
+      ? (localIdea.vibe || []).join(', ')
+      : (localIdea[field] ?? '');
+    setEditInput(String(val));
+    setEditing(field);
+  }
+
+  async function saveField(field) {
+    let value = editInput;
+    if (field === 'excitement') value = parseInt(editInput) || null;
+    if (field === 'vibe') value = editInput.split(',').map(v => v.trim()).filter(Boolean);
+    if (value === localIdea[field]) { setEditing(null); return; }
+    try {
+      await onUpdate(localIdea.id, { [field]: value });
+      setLocalIdea(prev => ({ ...prev, [field]: value }));
+    } catch {
+      alert(`Failed to update ${field}`);
+    }
+    setEditing(null);
+  }
+
+  function cancelEditing() { setEditing(null); }
 
   async function linkIdea(selectedId) {
     if (!selectedId) return;
@@ -129,36 +155,101 @@ export default function IdeaDetail({
 
           {/* Summary */}
           <div className="glass rounded-xl p-4">
-            {localIdea.status === 'refined' && (
-              <div className="flex items-center gap-1.5 mb-2">
-                <span className="text-xs text-accent font-medium">✨ AI Refined</span>
+            <div className="flex items-center justify-between mb-2">
+              {localIdea.status === 'refined' && <span className="text-xs text-accent font-medium">✨ AI Refined</span>}
+              <button onClick={() => startEditing('summary')} className="text-xs text-primary hover:text-primary/80 transition-colors ml-auto">Edit</button>
+            </div>
+            {editing === 'summary' ? (
+              <div className="space-y-2">
+                <textarea
+                  value={editInput}
+                  onChange={e => setEditInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Escape' && cancelEditing()}
+                  className="input w-full text-sm min-h-[80px] resize-y"
+                  placeholder="Summary…"
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <button onClick={() => saveField('summary')} className="px-3 py-1 rounded-lg bg-green-500 hover:bg-green-600 text-white text-xs">Save</button>
+                  <button onClick={cancelEditing} className="px-3 py-1 rounded-lg glass text-xs">Cancel</button>
+                </div>
               </div>
+            ) : (
+              <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-wrap">
+                {localIdea.summary || <span className="text-gray-500 italic">No summary — tap Edit to add one</span>}
+              </p>
             )}
-            <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-wrap">
-              {localIdea.summary || <span className="text-gray-500 italic">No summary yet</span>}
-            </p>
           </div>
 
           {/* Notes */}
-          {localIdea.notes && (
-            <div className="glass rounded-xl p-4">
-              <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Notes</h2>
-              <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-wrap">{localIdea.notes}</p>
+          <div className="glass rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wider">Notes</h2>
+              <button onClick={() => startEditing('notes')} className="text-xs text-primary hover:text-primary/80 transition-colors">Edit</button>
             </div>
-          )}
+            {editing === 'notes' ? (
+              <div className="space-y-2">
+                <textarea
+                  value={editInput}
+                  onChange={e => setEditInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Escape' && cancelEditing()}
+                  className="input w-full text-sm min-h-[80px] resize-y"
+                  placeholder="Notes…"
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <button onClick={() => saveField('notes')} className="px-3 py-1 rounded-lg bg-green-500 hover:bg-green-600 text-white text-xs">Save</button>
+                  <button onClick={cancelEditing} className="px-3 py-1 rounded-lg glass text-xs">Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-wrap">
+                {localIdea.notes || <span className="text-gray-500 italic">No notes — tap Edit to add some</span>}
+              </p>
+            )}
+          </div>
 
           {/* Metadata */}
           <div className="glass rounded-xl p-4 grid grid-cols-3 gap-3 text-sm">
-            <div className="text-center">
+            <button className="text-center" onClick={() => startEditing('excitement')}>
               <div className="text-xl mb-1">⚡</div>
-              <div className="text-white font-semibold">{localIdea.excitement ?? '—'}<span className="text-gray-500 text-xs">/10</span></div>
+              {editing === 'excitement' ? (
+                <input
+                  type="number" min="1" max="10"
+                  value={editInput}
+                  onChange={e => setEditInput(e.target.value)}
+                  onBlur={() => saveField('excitement')}
+                  onKeyDown={e => { if (e.key === 'Enter') saveField('excitement'); if (e.key === 'Escape') cancelEditing(); }}
+                  className="input w-full text-center text-sm font-semibold"
+                  autoFocus
+                />
+              ) : (
+                <div className="text-white font-semibold">{localIdea.excitement ?? '—'}<span className="text-gray-500 text-xs">/10</span></div>
+              )}
               <div className="text-gray-500 text-xs">Excitement</div>
-            </div>
-            <div className="text-center">
+            </button>
+            <button className="text-center" onClick={() => startEditing('complexity')}>
               <div className="text-xl mb-1">⏱️</div>
-              <div className="text-white font-semibold capitalize">{localIdea.complexity || '—'}</div>
+              {editing === 'complexity' ? (
+                <select
+                  value={editInput}
+                  onChange={async e => {
+                    const val = e.target.value;
+                    setEditInput(val);
+                    await onUpdate(localIdea.id, { complexity: val });
+                    setLocalIdea(prev => ({ ...prev, complexity: val }));
+                    setEditing(null);
+                  }}
+                  className="input w-full text-sm"
+                  autoFocus
+                >
+                  {['afternoon','weekend','week','month','months'].map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              ) : (
+                <div className="text-white font-semibold capitalize">{localIdea.complexity || '—'}</div>
+              )}
               <div className="text-gray-500 text-xs">Complexity</div>
-            </div>
+            </button>
             <div className="text-center">
               <div className="text-xl mb-1">📅</div>
               <div className="text-white font-semibold text-xs">
@@ -210,13 +301,35 @@ export default function IdeaDetail({
             )}
 
             {/* Vibe */}
-            {localIdea.vibe?.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-white/10">
-                {localIdea.vibe.map((v, i) => (
-                  <span key={i} className="px-2 py-0.5 rounded-full text-xs glass">{v}</span>
-                ))}
+            <div className="mt-3 pt-3 border-t border-white/10">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-500">Vibe</span>
+                <button onClick={() => startEditing('vibe')} className="text-xs text-primary hover:text-primary/80 transition-colors">Edit</button>
               </div>
-            )}
+              {editing === 'vibe' ? (
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={editInput}
+                    onChange={e => setEditInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') saveField('vibe'); if (e.key === 'Escape') cancelEditing(); }}
+                    className="input w-full text-sm"
+                    placeholder="creative, practical, ambitious"
+                    autoFocus
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={() => saveField('vibe')} className="px-3 py-1 rounded-lg bg-green-500 hover:bg-green-600 text-white text-xs">Save</button>
+                    <button onClick={cancelEditing} className="px-3 py-1 rounded-lg glass text-xs">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {localIdea.vibe?.length > 0
+                    ? localIdea.vibe.map((v, i) => <span key={i} className="px-2 py-0.5 rounded-full text-xs glass">{v}</span>)
+                    : <span className="text-gray-500 text-xs italic">No vibe set</span>}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Design Document */}
