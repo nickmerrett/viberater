@@ -9,9 +9,9 @@ metadata:
 spec:
   description: |
     CI/CD pipeline for Viberater platform.
-    Flow: clone → test (parallel, fail-fast) → build (parallel) → smoke → deploy.
-    Unit tests run directly against source before any Docker build so failures
-    are caught quickly without wasting build time.
+    Flow: clone → unit tests (parallel, fail-fast) → builds (parallel) → smoke → deploy.
+    Tests run against source using node:20-alpine before any Docker build.
+    Paths use the full viberater/ prefix (no subPath) matching the working cluster config.
   params:
     - name: repo-url
       description: The git repository URL to clone from.
@@ -54,7 +54,7 @@ spec:
         - name: basic-auth
           workspace: basic-auth
 
-    # ── 2a. Backend unit tests (runs against source, before Docker build) ─────
+    # ── 2a. Backend unit tests (source, fail-fast before build) ───────────────
     - name: test-backend
       runAfter:
         - fetch-repository
@@ -67,6 +67,8 @@ spec:
         steps:
           - name: install-and-test
             image: node:20-alpine
+            securityContext:
+              runAsUser: 0
             workingDir: $(workspaces.source.path)/viberater/backend
             env:
               - name: NODE_ENV
@@ -88,7 +90,7 @@ spec:
               npm test
               echo "=== Backend tests passed ==="
 
-    # ── 2b. Frontend unit tests (runs against source, before Docker build) ────
+    # ── 2b. Frontend unit tests (source, fail-fast before build) ─────────────
     - name: test-frontend
       runAfter:
         - fetch-repository
@@ -101,6 +103,8 @@ spec:
         steps:
           - name: install-and-test
             image: node:20-alpine
+            securityContext:
+              runAsUser: 0
             workingDir: $(workspaces.source.path)/viberater/frontend
             script: |
               #!/bin/sh
@@ -111,7 +115,7 @@ spec:
               npm test -- --run
               echo "=== Frontend tests passed ==="
 
-    # ── 3a. Build backend image (only after both test steps pass) ─────────────
+    # ── 3a. Build backend image (after both tests pass) ───────────────────────
     - name: build-backend
       runAfter:
         - test-backend
@@ -123,9 +127,9 @@ spec:
         - name: IMAGE
           value: $(params.backend-image)
         - name: DOCKERFILE
-          value: backend/Dockerfile
+          value: viberater/backend/Dockerfile
         - name: CONTEXT
-          value: backend
+          value: viberater/backend
         - name: TLSVERIFY
           value: 'false'
         - name: STORAGE_DRIVER
@@ -133,9 +137,8 @@ spec:
       workspaces:
         - name: source
           workspace: workspace
-          subPath: viberater
 
-    # ── 3b. Build frontend image (only after both test steps pass) ────────────
+    # ── 3b. Build frontend image (after both tests pass) ─────────────────────
     - name: build-frontend
       runAfter:
         - test-backend
@@ -147,9 +150,9 @@ spec:
         - name: IMAGE
           value: $(params.frontend-image)
         - name: DOCKERFILE
-          value: frontend/Dockerfile
+          value: viberater/frontend/Dockerfile
         - name: CONTEXT
-          value: frontend
+          value: viberater/frontend
         - name: TLSVERIFY
           value: 'false'
         - name: STORAGE_DRIVER
@@ -157,9 +160,8 @@ spec:
       workspaces:
         - name: source
           workspace: workspace
-          subPath: viberater
 
-    # ── 4. Smoke tests (verify both images actually start) ────────────────────
+    # ── 4. Smoke tests (verify both images start and respond) ─────────────────
     - name: smoke-tests
       runAfter:
         - build-backend
@@ -173,6 +175,7 @@ spec:
         - name: source
           workspace: workspace
       taskSpec:
+        metadata: {}
         params:
           - name: backend-image
             type: string
@@ -250,7 +253,7 @@ spec:
         - name: script
           value: |
             echo "=== Deploying Viberater ==="
-            kubectl apply -k k8s/
+            kubectl apply -k viberater/k8s/
             echo "----------"
             kubectl rollout status deployment/viberater-backend -n viberater --timeout=120s
             kubectl rollout status deployment/viberater-frontend -n viberater --timeout=120s
@@ -262,4 +265,3 @@ spec:
           workspace: empty-dir
         - name: manifest-dir
           workspace: workspace
-          subPath: viberater

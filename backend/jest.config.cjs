@@ -9,4 +9,6 @@ module.exports = {
   transform: {},
   globalSetup: './__tests__/globalSetup.cjs',
   testTimeout: 30000,
+  maxWorkers: 1,
+  testMatch: ['**/__tests__/**/*.test.js'],
 };

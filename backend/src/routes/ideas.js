@@ -30,7 +30,7 @@ router.get('/', async (req, res) => {
 
     // Get total count
     const countResult = await query(
-      'SELECT COUNT(*) FROM ideas WHERE user_id = $1',
+      'SELECT COUNT(*) as count FROM ideas WHERE user_id = $1',
       [req.user.userId]
     );
 
@@ -106,15 +106,15 @@ router.post('/', async (req, res) => {
         summary || null,
         transcript || null,
         conversation || null,
-        vibe || [],
+        JSON.stringify(vibe || []),
         excitement || null,
         complexity || null,
-        techStack || [],
+        JSON.stringify(techStack || []),
         notes || null,
-        links || [],
-        tags || [],
+        JSON.stringify(links || []),
+        JSON.stringify(tags || []),
         parent_idea_id || null,
-        related_ideas || []
+        JSON.stringify(related_ideas || [])
       ]
     );
 
@@ -177,9 +177,14 @@ router.put('/:id', async (req, res) => {
       RETURNING *`,
       [
         title, summary, transcript, conversation,
-        vibe, excitement, complexity, techStack,
-        status, notes, links, tags, archived,
-        related_ideas, parent_idea_id,
+        vibe != null ? JSON.stringify(vibe) : null, excitement, complexity,
+        techStack != null ? JSON.stringify(techStack) : null,
+        status, notes,
+        links != null ? JSON.stringify(links) : null,
+        tags != null ? JSON.stringify(tags) : null,
+        archived,
+        related_ideas != null ? JSON.stringify(related_ideas) : null,
+        parent_idea_id,
         req.params.id, req.user.userId
       ]
     );
