@@ -84,6 +84,7 @@ export default function CaptureChat({ onNavigate }) {
   const inputRef = useRef(null);
   const syncingRef = useRef(false);
   const initialScrollDone = useRef(false);
+  const wasOnlineRef = useRef(navigator.onLine);
 
   // Load all messages on mount
   useEffect(() => { loadHistory(); }, []);
@@ -108,9 +109,14 @@ export default function CaptureChat({ onNavigate }) {
     bottomRef.current?.scrollIntoView({ behavior });
   }, [messages, pendingMessages]);
 
-  // When coming back online, reload history and flush the pending queue
+  // When coming back online (offline→online transition), reload history and flush queue
   useEffect(() => {
-    if (!isOnline) return;
+    if (!isOnline) {
+      wasOnlineRef.current = false;
+      return;
+    }
+    if (wasOnlineRef.current) return; // already online at mount — skip
+    wasOnlineRef.current = true;
     loadHistory();
     if (pendingMessages.length > 0 && !syncingRef.current) {
       flushPending();
