@@ -1,7 +1,7 @@
 export default {
   claude: {
     apiKey: process.env.CLAUDE_API_KEY,
-    model: 'claude-sonnet-4-5-20250929',
+    model: 'claude-sonnet-4-6',
     maxTokens: 200000
   },
   openai: {

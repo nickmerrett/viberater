@@ -77,7 +77,7 @@ class AIService {
     if (!this.anthropic) throw new Error('Claude API key not configured');
 
     const systemPrompt = options.systemPrompt || this.getDefaultSystemPrompt();
-    const model = options.model || process.env.MODEL_PRIMARY || 'claude-sonnet-4-5';
+    const model = options.model || process.env.MODEL_PRIMARY || 'claude-sonnet-4-6';
     let fullContent = '';
 
     const stream = this.anthropic.messages.stream({
@@ -129,7 +129,7 @@ class AIService {
     }
 
     const systemPrompt = options.systemPrompt || this.getDefaultSystemPrompt();
-    const model = options.model || process.env.MODEL_PRIMARY || 'claude-3-5-sonnet-20240620';
+    const model = options.model || process.env.MODEL_PRIMARY || 'claude-sonnet-4-6';
 
     try {
       const response = await this.anthropic.messages.create({
@@ -359,7 +359,7 @@ Help me think this through!`;
       console.log('[AI Service] Extracting idea details with Claude...');
 
       const response = await this.anthropic.messages.create({
-        model: process.env.MODEL_PRIMARY || 'claude-3-5-sonnet-20240620',
+        model: process.env.MODEL_PRIMARY || 'claude-sonnet-4-6',
         max_tokens: 1024,
         messages: [{
           role: 'user',
@@ -412,7 +412,7 @@ Respond ONLY with valid JSON in this exact format:
         name: 'Claude',
         available: !!this.anthropic,
         configured: !!process.env.CLAUDE_API_KEY,
-        models: ['claude-3-5-sonnet-20240620', 'claude-3-opus-20240229', 'claude-3-haiku-20240307']
+        models: ['claude-sonnet-4-6', 'claude-opus-4-7', 'claude-haiku-4-5']
       },
       openai: {
         name: 'OpenAI',
