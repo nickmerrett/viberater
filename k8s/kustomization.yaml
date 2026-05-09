@@ -4,14 +4,13 @@ kind: Kustomization
 namespace: viberater
 
 resources:
-  - namespace.yaml
   - configmap.yaml
-  - postgres-pvc.yaml
-  - postgres-deployment.yaml
   - backend-deployment.yaml
   - frontend-deployment.yaml
+  - frontend-service.yaml
+  - backend-service.yaml
   - routes.yaml
-
+  - pvc.yaml
 # Note: Create secrets separately with kubectl create secret
 # or use sealed-secrets/external-secrets in production
 

@@ -9,7 +9,7 @@ spec:
   host: viberater.apps.homeserv.merrett.lan
   to:
     kind: Service
-    name: viberater-frontend-service
+    name: viberater-frontend
     weight: 100
   port:
     targetPort: http

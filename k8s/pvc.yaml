@@ -1,0 +1,22 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  annotations:
+    volume.beta.kubernetes.io/storage-provisioner: topolvm.io
+    volume.kubernetes.io/selected-node: homeserv
+    volume.kubernetes.io/storage-provisioner: topolvm.io
+  name: backend-storage-pvc
+  namespace: viberater
+  finalizers:
+    - kubernetes.io/pvc-protection
+  labels:
+    app.kubernetes.io/name: vibrater
+    app.kubernetes.io/version: '2.0'
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: topolvm-provisioner
+  volumeMode: Filesystem

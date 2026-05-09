@@ -114,7 +114,9 @@ async function purgeExpiredTokens() {
     const result = await query('DELETE FROM refresh_tokens WHERE expires_at < NOW()');
     if (result.rowCount > 0) console.log(`[auth] Purged ${result.rowCount} expired refresh tokens`);
   } catch (e) {
-    console.error('[auth] Token purge failed:', e.message);
+    if (!e.message?.includes('no such table')) {
+      console.error('[auth] Token purge failed:', e.message);
+    }
   }
 }
 purgeExpiredTokens();
