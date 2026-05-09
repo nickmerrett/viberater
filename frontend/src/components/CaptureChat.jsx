@@ -78,6 +78,8 @@ export default function CaptureChat({ onNavigate }) {
   const [pendingMessages, setPendingMessages] = useState(loadPending);
   const [cmdSuggestions, setCmdSuggestions] = useState([]);
   const [cmdIndex, setCmdIndex] = useState(0);
+  const [showHistory, setShowHistory] = useState(false);
+  const [sessions, setSessions] = useState([]);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
   const syncingRef = useRef(false);
@@ -116,8 +118,28 @@ export default function CaptureChat({ onNavigate }) {
     setSessionId(id);
     setMessages([]);
     setCapturedIdeas([]);
+    setShowHistory(false);
     initialScrollDone.current = false;
     inputRef.current?.focus();
+  }
+
+  async function openHistory() {
+    try {
+      const data = await api.getCaptureSessions();
+      setSessions(data.sessions || []);
+    } catch (e) {
+      console.error('Failed to load sessions:', e);
+    }
+    setShowHistory(true);
+  }
+
+  function switchToSession(sid) {
+    localStorage.setItem(SESSION_KEY, sid);
+    setSessionId(sid);
+    setMessages([]);
+    setCapturedIdeas([]);
+    setShowHistory(false);
+    initialScrollDone.current = false;
   }
 
   function addSystemMsg(text) {
@@ -365,19 +387,62 @@ export default function CaptureChat({ onNavigate }) {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 flex-shrink-0">
         <span className="text-xs text-gray-500 font-medium tracking-wide uppercase">Capture</span>
-        <button
-          onClick={newChat}
-          className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-white/5"
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          New chat
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={openHistory}
+            className={`flex items-center gap-1 text-xs transition-colors px-2 py-1 rounded-lg hover:bg-white/5 ${showHistory ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+            title="Past chats"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            History
+          </button>
+          <button
+            onClick={newChat}
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-white/5"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            New chat
+          </button>
+        </div>
       </div>
 
+      {/* Session history panel */}
+      {showHistory && (
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Past chats</span>
+            <button onClick={() => setShowHistory(false)} className="text-xs text-gray-500 hover:text-white transition-colors">✕ Close</button>
+          </div>
+          {sessions.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-8">No past chats found</p>
+          ) : (
+            sessions.map(s => (
+              <button
+                key={s.session_id}
+                onClick={() => switchToSession(s.session_id)}
+                className={`w-full text-left glass rounded-xl px-3 py-3 hover:bg-white/5 transition-all ${s.session_id === sessionId ? 'border border-white/20' : ''}`}
+              >
+                <p className="text-sm text-gray-200 truncate">
+                  {s.preview ? (s.preview.length > 45 ? s.preview.slice(0, s.preview.lastIndexOf(' ', 45)) + '…' : s.preview) : 'Chat session'}
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs text-gray-500">
+                    {new Date(s.last_message_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <span className="text-xs text-gray-600">· {s.message_count} messages</span>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
+      {!showHistory && <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
         {allForDisplay.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center px-8">
             <div className="text-4xl mb-4">💬</div>
@@ -441,7 +506,7 @@ export default function CaptureChat({ onNavigate }) {
         ))}
 
         <div ref={bottomRef} />
-      </div>
+      </div>}
 
       {/* Recently captured ideas strip */}
       {capturedIdeas.length > 0 && (
@@ -456,7 +521,7 @@ export default function CaptureChat({ onNavigate }) {
       )}
 
       {/* Offline / pending banner */}
-      {(!isOnline || (isOnline && hasPending && sending)) && (
+      {!showHistory && (!isOnline || (isOnline && hasPending && sending)) && (
         <div className={`mx-4 mb-2 px-4 py-2.5 rounded-xl flex items-center gap-2 border ${
           !isOnline
             ? 'bg-orange-500/10 border-orange-500/30'
@@ -473,7 +538,7 @@ export default function CaptureChat({ onNavigate }) {
       )}
 
       {/* Input */}
-      <div className="px-4 py-3 border-t border-white/10">
+      {!showHistory && <div className="px-4 py-3 border-t border-white/10">
         {/* Slash command autocomplete */}
         {cmdSuggestions.length > 0 && (
           <div className="mb-2 glass rounded-xl border border-white/10 overflow-hidden">
@@ -522,7 +587,7 @@ export default function CaptureChat({ onNavigate }) {
         <p className="text-xs text-gray-600 mt-1.5 px-1">
           {isOnline ? 'Enter to send · Shift+Enter for new line' : 'Offline · messages queued locally'}
         </p>
-      </div>
+      </div>}
     </div>
   );
 }

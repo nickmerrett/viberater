@@ -299,6 +299,10 @@ class APIClient {
   }
 
   // Capture chat endpoints
+  async getCaptureSessions() {
+    return this.request('/capture/sessions');
+  }
+
   async getCaptureMessages(sessionId) {
     const qs = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : '';
     return this.request(`/capture/messages${qs}`);
