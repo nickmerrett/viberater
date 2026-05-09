@@ -2,6 +2,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { toFile } from 'openai/uploads';
 
+const DEFAULT_CLAUDE_MODEL = DEFAULT_CLAUDE_MODEL;
+const DEFAULT_OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o';
+
 class AIService {
   constructor() {
     this.defaultProvider = process.env.DEFAULT_AI_PROVIDER || 'claude';
@@ -77,7 +80,7 @@ class AIService {
     if (!this.anthropic) throw new Error('Claude API key not configured');
 
     const systemPrompt = options.systemPrompt || this.getDefaultSystemPrompt();
-    const model = options.model || process.env.MODEL_PRIMARY || 'claude-sonnet-4-6';
+    const model = options.model || DEFAULT_CLAUDE_MODEL;
     let fullContent = '';
 
     const stream = this.anthropic.messages.stream({
@@ -102,7 +105,7 @@ class AIService {
     if (!this.openai) throw new Error('OpenAI API key not configured');
 
     const systemPrompt = options.systemPrompt || this.getDefaultSystemPrompt();
-    const model = options.model || 'gpt-4o';
+    const model = options.model || DEFAULT_OPENAI_MODEL;
     let fullContent = '';
 
     const stream = await this.openai.chat.completions.create({
@@ -129,7 +132,7 @@ class AIService {
     }
 
     const systemPrompt = options.systemPrompt || this.getDefaultSystemPrompt();
-    const model = options.model || process.env.MODEL_PRIMARY || 'claude-sonnet-4-6';
+    const model = options.model || DEFAULT_CLAUDE_MODEL;
 
     try {
       const response = await this.anthropic.messages.create({
@@ -164,7 +167,7 @@ class AIService {
     }
 
     const systemPrompt = options.systemPrompt || this.getDefaultSystemPrompt();
-    const model = options.model || 'gpt-4';
+    const model = options.model || DEFAULT_OPENAI_MODEL;
 
     try {
       const response = await this.openai.chat.completions.create({
@@ -359,7 +362,7 @@ Help me think this through!`;
       console.log('[AI Service] Extracting idea details with Claude...');
 
       const response = await this.anthropic.messages.create({
-        model: process.env.MODEL_PRIMARY || 'claude-sonnet-4-6',
+        model: DEFAULT_CLAUDE_MODEL,
         max_tokens: 1024,
         messages: [{
           role: 'user',
