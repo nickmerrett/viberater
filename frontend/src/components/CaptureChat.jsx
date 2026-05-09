@@ -85,9 +85,19 @@ export default function CaptureChat({ onNavigate }) {
   const syncingRef = useRef(false);
   const initialScrollDone = useRef(false);
 
-  // Load all messages on mount — don't filter by sessionId so history is always visible
-  // Session ID is used when sending, not when loading the full thread
+  // Load all messages on mount
   useEffect(() => { loadHistory(); }, []);
+
+  // Reload messages when PWA comes back into foreground (cross-device sync)
+  useEffect(() => {
+    function handleVisibility() {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        loadHistory();
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
 
   useEffect(() => {
     if (!messages.length && !pendingMessages.length) return;

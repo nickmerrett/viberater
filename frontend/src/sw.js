@@ -13,14 +13,16 @@ registerRoute(
   new NetworkOnly()
 );
 
-// All other API calls: try network first, fall back to cache for up to 5 minutes
+// API calls: network first, short cache fallback for flaky connections only.
+// 30s is long enough to survive a brief connectivity blip but short enough
+// that cross-device changes show up quickly when the app is foregrounded.
 registerRoute(
   ({ url }) => url.pathname.startsWith('/api/'),
   new NetworkFirst({
     cacheName: 'api-cache',
-    networkTimeoutSeconds: 10,
+    networkTimeoutSeconds: 5,
     plugins: [
-      new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 5 * 60 }),
+      new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 30 }),
       new CacheableResponsePlugin({ statuses: [0, 200] }),
     ],
   })

@@ -10,20 +10,20 @@ spec:
   description: |
     CI/CD pipeline for Viberater platform.
     Flow: clone → unit tests (parallel, fail-fast) → builds (parallel) → smoke → deploy.
-    Tests run against source using node:20-alpine before any Docker build.
-    Paths use the full viberater/ prefix (no subPath) matching the working cluster config.
+    Images are tagged with the git commit SHA for traceability and to guarantee
+    Kubernetes detects the new image on every deploy.
   params:
     - name: repo-url
       description: The git repository URL to clone from.
       type: string
     - name: tag-name
-      description: The git tag to clone.
+      description: The git tag or branch to clone.
       type: string
     - name: backend-image
-      description: 'Full image path for backend (e.g. registry/viberater-backend:latest)'
+      description: 'Base image path for backend WITHOUT tag (e.g. registry/viberater-backend)'
       type: string
     - name: frontend-image
-      description: 'Full image path for frontend (e.g. registry/viberater-frontend:latest)'
+      description: 'Base image path for frontend WITHOUT tag (e.g. registry/viberater-frontend)'
       type: string
     - name: deployment-manifest
       description: Path to the deployment manifests directory.
@@ -115,7 +115,7 @@ spec:
               npm test -- --run
               echo "=== Frontend tests passed ==="
 
-    # ── 3a. Build backend image (after both tests pass) ───────────────────────
+    # ── 3a. Build backend image — tagged with git commit SHA ──────────────────
     - name: build-backend
       runAfter:
         - test-backend
@@ -125,7 +125,7 @@ spec:
         name: buildah
       params:
         - name: IMAGE
-          value: $(params.backend-image)
+          value: $(params.backend-image):$(tasks.fetch-repository.results.commit)
         - name: DOCKERFILE
           value: viberater/backend/Dockerfile
         - name: CONTEXT
@@ -138,7 +138,7 @@ spec:
         - name: source
           workspace: workspace
 
-    # ── 3b. Build frontend image (after both tests pass) ─────────────────────
+    # ── 3b. Build frontend image — tagged with git commit SHA ─────────────────
     - name: build-frontend
       runAfter:
         - test-backend
@@ -148,7 +148,7 @@ spec:
         name: buildah
       params:
         - name: IMAGE
-          value: $(params.frontend-image)
+          value: $(params.frontend-image):$(tasks.fetch-repository.results.commit)
         - name: DOCKERFILE
           value: viberater/frontend/Dockerfile
         - name: CONTEXT
@@ -161,16 +161,16 @@ spec:
         - name: source
           workspace: workspace
 
-    # ── 4. Smoke tests (verify both images start and respond) ─────────────────
+    # ── 4. Smoke tests — run against the SHA-tagged image ────────────────────
     - name: smoke-tests
       runAfter:
         - build-backend
         - build-frontend
       params:
         - name: backend-image
-          value: $(params.backend-image)
+          value: $(params.backend-image):$(tasks.fetch-repository.results.commit)
         - name: frontend-image
-          value: $(params.frontend-image)
+          value: $(params.frontend-image):$(tasks.fetch-repository.results.commit)
       workspaces:
         - name: source
           workspace: workspace
@@ -242,7 +242,7 @@ spec:
 
               echo "=== Smoke tests passed ==="
 
-    # ── 5. Deploy ─────────────────────────────────────────────────────────────
+    # ── 5. Deploy — apply manifests then pin deployments to the built SHA ─────
     - name: deploy
       runAfter:
         - smoke-tests
@@ -252,9 +252,20 @@ spec:
       params:
         - name: script
           value: |
-            echo "=== Deploying Viberater ==="
+            COMMIT="$(tasks.fetch-repository.results.commit)"
+            echo "=== Deploying Viberater (commit: $COMMIT) ==="
+
             kubectl apply -k viberater/k8s/
-            echo "----------"
+
+            echo "--- Updating images to commit $COMMIT ---"
+            kubectl set image deployment/viberater-backend \
+              backend=$(params.backend-image):$COMMIT \
+              -n viberater
+            kubectl set image deployment/viberater-frontend \
+              frontend=$(params.frontend-image):$COMMIT \
+              -n viberater
+
+            echo "--- Waiting for rollout ---"
             kubectl rollout status deployment/viberater-backend -n viberater --timeout=120s
             kubectl rollout status deployment/viberater-frontend -n viberater --timeout=120s
             echo "----------"

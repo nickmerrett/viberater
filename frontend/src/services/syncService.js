@@ -5,41 +5,33 @@ class SyncService {
   constructor() {
     this.isSyncing = false;
     this.syncListeners = [];
+    this.refreshListeners = []; // called after a successful pull so stores update UI
   }
 
-  // Check if online
-  isOnline() {
-    return navigator.onLine;
-  }
+  // ── Event listeners ───────────────────────────────────────────────────────
 
-  // Add listeners for sync events
-  onSyncStart(callback) {
-    this.syncListeners.push({ event: 'start', callback });
-  }
-
-  onSyncComplete(callback) {
-    this.syncListeners.push({ event: 'complete', callback });
-  }
-
-  onSyncError(callback) {
-    this.syncListeners.push({ event: 'error', callback });
-  }
+  onSyncStart(callback) { this.syncListeners.push({ event: 'start', callback }); }
+  onSyncComplete(callback) { this.syncListeners.push({ event: 'complete', callback }); }
+  onSyncError(callback) { this.syncListeners.push({ event: 'error', callback }); }
 
   emit(event, data) {
-    this.syncListeners
-      .filter(l => l.event === event)
-      .forEach(l => l.callback(data));
+    this.syncListeners.filter(l => l.event === event).forEach(l => l.callback(data));
   }
 
-  // Queue an operation for sync
+  // Register a callback that fires after a successful server pull.
+  // Used by zustand stores to update their in-memory state from IndexedDB.
+  addRefreshListener(fn) {
+    this.refreshListeners.push(fn);
+  }
+
+  // ── Offline queue ─────────────────────────────────────────────────────────
+
   async queueOperation(operation) {
     await db.addToSyncQueue(operation);
 
     if (this.isOnline()) {
       this.sync();
     } else {
-      // Register Background Sync so the browser triggers sync when
-      // connectivity returns, even if the tab is closed (Chrome/Android)
       this._registerBackgroundSync();
     }
   }
@@ -50,16 +42,15 @@ class SyncService {
         const registration = await navigator.serviceWorker.ready;
         await registration.sync.register('viberater-sync');
       }
-    } catch (e) {
+    } catch {
       // Background Sync not available — online event handler is the fallback
     }
   }
 
-  // Sync all pending operations
+  // ── Push pending offline operations to server ─────────────────────────────
+
   async sync() {
-    if (this.isSyncing || !this.isOnline()) {
-      return;
-    }
+    if (this.isSyncing || !this.isOnline()) return;
 
     this.isSyncing = true;
     this.emit('start');
@@ -73,7 +64,6 @@ class SyncService {
           await db.markSynced(op.id);
         } catch (error) {
           console.error('Failed to sync operation:', op, error);
-          // Keep in queue to retry later
         }
       }
 
@@ -86,152 +76,115 @@ class SyncService {
     }
   }
 
-  // Execute a single operation
   async executeOperation(op) {
-    const { type, resource, method, data, id } = op;
-
+    const { resource, method, data, id } = op;
     switch (resource) {
-      case 'idea':
-        return this.syncIdea(method, data, id);
-      case 'project':
-        return this.syncProject(method, data, id);
-      case 'task':
-        return this.syncTask(method, data, id);
-      default:
-        throw new Error(`Unknown resource type: ${resource}`);
+      case 'idea':    return this.syncIdea(method, data, id);
+      case 'project': return this.syncProject(method, data, id);
+      case 'task':    return this.syncTask(method, data, id);
+      default: throw new Error(`Unknown resource type: ${resource}`);
     }
   }
 
   async syncIdea(method, data, id) {
     switch (method) {
-      case 'CREATE':
-        const created = await api.createIdea(data);
-        // Update local copy with server ID
-        await db.deleteIdea(id);
-        await db.saveIdea(created.idea);
-        return created;
-
-      case 'UPDATE':
-        const updated = await api.updateIdea(id, data);
-        await db.saveIdea(updated.idea);
-        return updated;
-
-      case 'DELETE':
-        await api.deleteIdea(id);
-        await db.deleteIdea(id);
-        return;
-
-      default:
-        throw new Error(`Unknown method: ${method}`);
+      case 'CREATE': { const r = await api.createIdea(data); await db.deleteIdea(id); await db.saveIdea(r.idea); return r; }
+      case 'UPDATE': { const r = await api.updateIdea(id, data); await db.saveIdea(r.idea); return r; }
+      case 'DELETE': { await api.deleteIdea(id); await db.deleteIdea(id); return; }
+      default: throw new Error(`Unknown method: ${method}`);
     }
   }
 
   async syncProject(method, data, id) {
     switch (method) {
-      case 'CREATE':
-        const created = await api.createProject(data);
-        await db.deleteProject(id);
-        await db.saveProject(created.project);
-        return created;
-
-      case 'UPDATE':
-        const updated = await api.updateProject(id, data);
-        await db.saveProject(updated.project);
-        return updated;
-
-      case 'DELETE':
-        await api.deleteProject(id);
-        await db.deleteProject(id);
-        return;
-
-      default:
-        throw new Error(`Unknown method: ${method}`);
+      case 'CREATE': { const r = await api.createProject(data); await db.deleteProject(id); await db.saveProject(r.project); return r; }
+      case 'UPDATE': { const r = await api.updateProject(id, data); await db.saveProject(r.project); return r; }
+      case 'DELETE': { await api.deleteProject(id); await db.deleteProject(id); return; }
+      default: throw new Error(`Unknown method: ${method}`);
     }
   }
 
   async syncTask(method, data, id) {
     switch (method) {
-      case 'CREATE':
-        const created = await api.createTask(data.project_id, data);
-        await db.deleteTask(id);
-        await db.saveTask(created.task);
-        return created;
-
-      case 'UPDATE':
-        const updated = await api.updateTask(id, data);
-        await db.saveTask(updated.task);
-        return updated;
-
-      case 'DELETE':
-        await api.deleteTask(id);
-        await db.deleteTask(id);
-        return;
-
-      default:
-        throw new Error(`Unknown method: ${method}`);
+      case 'CREATE': { const r = await api.createTask(data.project_id, data); await db.deleteTask(id); await db.saveTask(r.task); return r; }
+      case 'UPDATE': { const r = await api.updateTask(id, data); await db.saveTask(r.task); return r; }
+      case 'DELETE': { await api.deleteTask(id); await db.deleteTask(id); return; }
+      default: throw new Error(`Unknown method: ${method}`);
     }
   }
 
-  // Pull latest data from server
+  // ── Pull latest from server → IndexedDB → notify stores ──────────────────
+
+  isOnline() { return navigator.onLine; }
+
   async pullFromServer() {
-    if (!this.isOnline()) {
-      throw new Error('Cannot pull from server while offline');
-    }
-    // Skip silently if unauthenticated — avoids 401 redirect on public pages
+    if (!this.isOnline()) return;
     if (!localStorage.getItem('viberater_access_token')) return;
 
     try {
-      // Fetch all data
       const [ideasData, projectsData] = await Promise.all([
         api.getIdeas(),
-        api.getProjects()
+        api.getProjects(),
       ]);
 
-      // Save to IndexedDB
       await db.saveIdeas(ideasData.ideas);
       await db.saveProjects(projectsData.projects);
 
-      // Fetch tasks for each project
       for (const project of projectsData.projects) {
         const tasksData = await api.getProjectTasks(project.id);
         await db.saveTasks(tasksData.tasks);
       }
 
-      return {
-        ideas: ideasData.ideas.length,
-        projects: projectsData.projects.length
-      };
+      // Notify zustand stores so UI reflects the new data
+      for (const fn of this.refreshListeners) {
+        await fn().catch(() => {});
+      }
+
+      return { ideas: ideasData.ideas.length, projects: projectsData.projects.length };
     } catch (error) {
       console.error('Failed to pull from server:', error);
       throw error;
     }
   }
 
-  // Initialize sync on app start
+  // ── Bidirectional sync: push local changes first, then pull server state ──
+
+  async syncAndRefresh() {
+    if (!this.isOnline() || !localStorage.getItem('viberater_access_token')) return;
+    await this.sync();          // 1. push any pending offline ops to server
+    await this.pullFromServer(); // 2. pull server state (now includes our changes + others')
+  }
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
+
   init() {
-    // Sync when tab comes back online (only if authenticated)
+    // Online event: push pending ops, then refresh from server
     window.addEventListener('online', () => {
-      if (!localStorage.getItem('viberater_access_token')) return;
-      console.log('Back online - syncing...');
-      this.sync();
+      console.log('Back online — syncing...');
+      this.syncAndRefresh().catch(() => {});
     });
 
-    // Listen for Background Sync messages from the service worker
-    // (fires when connectivity restored while tab was closed)
+    // Background Sync message from SW (connectivity restored while tab closed)
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.addEventListener('message', (event) => {
         if (event.data?.type === 'BACKGROUND_SYNC') {
-          console.log('Background sync triggered by service worker');
-          this.sync();
+          console.log('Background sync triggered by SW');
+          this.syncAndRefresh().catch(() => {});
         }
       });
     }
 
-    // Try to pull data if online
+    // Foreground event: app comes back into view (e.g. switching from another app on phone)
+    // Push any local changes first, then pull server state — handles cross-device sync
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      console.log('App foregrounded — bidirectional sync');
+      this.syncAndRefresh().catch(() => {});
+    });
+
+    // Initial pull on startup
     if (this.isOnline()) {
-      this.pullFromServer().catch(err => {
-        console.error('Initial pull failed:', err);
-      });
+      this.pullFromServer().catch(err => console.error('Initial pull failed:', err));
     }
   }
 }

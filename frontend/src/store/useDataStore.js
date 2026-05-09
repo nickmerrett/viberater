@@ -19,6 +19,23 @@ export const useDataStore = create((set, get) => ({
 
     try {
       await db.init();
+
+      // Register a refresh listener so pullFromServer() updates the UI state,
+      // not just IndexedDB — this is what makes cross-device sync visible
+      syncService.addRefreshListener(async () => {
+        const [ideas, projects, allTasks] = await Promise.all([
+          db.getAllIdeas(),
+          db.getAllProjects(),
+          db.getAllTasks(),
+        ]);
+        const tasks = allTasks.reduce((acc, task) => {
+          if (!acc[task.project_id]) acc[task.project_id] = [];
+          acc[task.project_id].push(task);
+          return acc;
+        }, {});
+        set({ ideas, projects, tasks });
+      });
+
       syncService.init();
       dbInitialized = true;
 
