@@ -30,7 +30,7 @@ FROM docker.io/nginx:alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Copy nginx config as a template — BACKEND_URL is substituted at runtime
-COPY nginx-openshift.conf /etc/nginx/nginx.conf.template
+COPY --from=builder /app/nginx-openshift.conf /etc/nginx/nginx.conf.template
 
 # Create temp directories and set permissions for arbitrary UID
 RUN mkdir -p /tmp/client_temp /tmp/proxy_temp /tmp/fastcgi_temp /tmp/uwsgi_temp /tmp/scgi_temp && \
