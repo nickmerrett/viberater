@@ -428,6 +428,131 @@ Respond ONLY with valid JSON in this exact format:
       }
     };
   }
+
+  // ── Agentic tool loop ──────────────────────────────────────────────────
+  // Runs until the AI produces a final text response with no tool calls.
+  // onEvent(event) is called for streaming updates:
+  //   { type: 'tool_call', name, args }
+  //   { type: 'tool_result', name, result }
+  //   { type: 'token', text }
+  //   { type: 'done', content }
+
+  async runWithTools(messages, tools, onEvent, options = {}) {
+    const provider = options.provider || this.defaultProvider;
+    const { callTool } = await import('./toolService.js');
+
+    switch (provider) {
+      case 'claude':  return this._runWithToolsClaude(messages, tools, callTool, onEvent, options);
+      case 'openai':  return this._runWithToolsOpenAI(messages, tools, callTool, onEvent, options);
+      default:        return this._runWithToolsClaude(messages, tools, callTool, onEvent, options);
+    }
+  }
+
+  async _runWithToolsClaude(messages, tools, callTool, onEvent, options) {
+    if (!this.anthropic) throw new Error('Claude API key not configured');
+
+    const model = options.model || process.env.MODEL_PRIMARY || 'claude-sonnet-4-5';
+    const systemPrompt = options.systemPrompt || '';
+
+    // Translate neutral tool format → Claude format
+    const claudeTools = tools.map(t => ({
+      name: t.name,
+      description: t.description,
+      input_schema: t.parameters,
+    }));
+
+    const history = [...messages];
+
+    while (true) {
+      const response = await this.anthropic.messages.create({
+        model,
+        max_tokens: options.maxTokens || 2048,
+        system: systemPrompt,
+        tools: claudeTools,
+        messages: history,
+      });
+
+      // Collect text and tool_use blocks
+      let textContent = '';
+      const toolUses = [];
+
+      for (const block of response.content) {
+        if (block.type === 'text') {
+          textContent += block.text;
+          // Stream tokens word-by-word (non-streaming path, best effort)
+          for (const word of block.text.split(/(?<=\s)/)) {
+            onEvent({ type: 'token', text: word });
+          }
+        } else if (block.type === 'tool_use') {
+          toolUses.push(block);
+        }
+      }
+
+      // No tool calls — we're done
+      if (toolUses.length === 0 || response.stop_reason === 'end_turn') {
+        onEvent({ type: 'done', content: textContent });
+        return textContent;
+      }
+
+      // Execute each tool call
+      history.push({ role: 'assistant', content: response.content });
+
+      const toolResults = [];
+      for (const tu of toolUses) {
+        onEvent({ type: 'tool_call', name: tu.name, args: tu.input });
+        const result = await callTool(tu.name, tu.input);
+        onEvent({ type: 'tool_result', name: tu.name, result });
+        toolResults.push({ type: 'tool_result', tool_use_id: tu.id, content: result });
+      }
+
+      history.push({ role: 'user', content: toolResults });
+    }
+  }
+
+  async _runWithToolsOpenAI(messages, tools, callTool, onEvent, options) {
+    if (!this.openai) throw new Error('OpenAI API key not configured');
+
+    const model = options.model || 'gpt-4o';
+    const systemPrompt = options.systemPrompt || '';
+
+    // Translate neutral tool format → OpenAI format
+    const openaiTools = tools.map(t => ({
+      type: 'function',
+      function: { name: t.name, description: t.description, parameters: t.parameters },
+    }));
+
+    const history = [
+      ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
+      ...messages,
+    ];
+
+    while (true) {
+      const response = await this.openai.chat.completions.create({
+        model,
+        max_tokens: options.maxTokens || 2048,
+        tools: openaiTools,
+        messages: history,
+      });
+
+      const msg = response.choices[0].message;
+      history.push(msg);
+
+      if (!msg.tool_calls?.length) {
+        const text = msg.content || '';
+        for (const word of text.split(/(?<=\s)/)) onEvent({ type: 'token', text: word });
+        onEvent({ type: 'done', content: text });
+        return text;
+      }
+
+      for (const tc of msg.tool_calls) {
+        const args = JSON.parse(tc.function.arguments);
+        onEvent({ type: 'tool_call', name: tc.function.name, args });
+        const result = await callTool(tc.function.name, args);
+        onEvent({ type: 'tool_result', name: tc.function.name, result });
+        history.push({ role: 'tool', tool_call_id: tc.id, content: result });
+      }
+    }
+  }
 }
 
 export const aiService = new AIService();

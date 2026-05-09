@@ -19,6 +19,7 @@ import captureRoutes from './routes/capture.js';
 import areasRoutes, { bootstrapAreas } from './routes/areas.js';
 import attachmentsRoutes from './routes/attachments.js';
 import shareRoutes from './routes/share.js';
+import researchRoutes from './routes/research.js';
 import { query } from './config/database.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -88,6 +89,7 @@ app.use('/api/capture', captureRoutes);
 app.use('/api/areas', areasRoutes);
 app.use('/api/attachments', attachmentsRoutes);
 app.use('/api/share', shareRoutes);
+app.use('/api/research', researchRoutes);
 
 // 404 handler
 app.use((req, res) => {

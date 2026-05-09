@@ -5,6 +5,7 @@ import DesignDocument from './DesignDocument';
 import AttachmentList from './AttachmentList';
 import AttachmentUpload from './AttachmentUpload';
 import ShareToggle from './ShareToggle';
+import ResearchPanel from './ResearchPanel';
 
 export default function IdeaDetail({
   idea,
@@ -302,6 +303,12 @@ export default function IdeaDetail({
               </div>
             </div>
           )}
+
+          {/* Research */}
+          <div className="glass rounded-xl p-4">
+            <h3 className="text-sm font-medium text-gray-400 mb-3">Validate idea</h3>
+            <ResearchPanel idea={localIdea} />
+          </div>
 
           {/* Share */}
           <div className="glass rounded-xl p-4">

@@ -9,6 +9,26 @@ import AreaSelect from './AreaSelect';
 import SplitIdeaModal from './SplitIdeaModal';
 import IdeaDetail from './IdeaDetail';
 
+function TagFilter({ allTags, selectedTags, onToggle }) {
+  return (
+    <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
+      {allTags.map(tag => (
+        <button
+          key={tag}
+          onClick={() => onToggle(tag)}
+          className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+            selectedTags.includes(tag)
+              ? 'bg-accent text-white'
+              : 'glass hover:bg-white/5'
+          }`}
+        >
+          #{tag}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function IdeasView({ activeArea = null }) {
   const { ideas, fetchIdeas, createIdea, promoteIdea, deleteIdea, updateIdea, loading } = useDataStore();
   const [filter, setFilter] = useState('active');
@@ -146,7 +166,12 @@ export default function IdeasView({ activeArea = null }) {
   };
 
   // Get all unique tags from all ideas
-  const allTags = [...new Set(ideas.flatMap(idea => idea.tags || []))].sort();
+  const allTags = Object.entries(
+    ideas.flatMap(i => i.tags || []).reduce((acc, tag) => {
+      acc[tag] = (acc[tag] || 0) + 1;
+      return acc;
+    }, {})
+  ).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([tag]) => tag);
 
   const filteredIdeas = ideas.filter(idea => {
     // Filter by archive status
@@ -449,21 +474,11 @@ export default function IdeasView({ activeArea = null }) {
 
           {/* Tag Filters */}
           {allTags.length > 0 && (
-            <div className="flex gap-2 flex-1 overflow-x-auto">
-              {allTags.map(tag => (
-                <button
-                  key={tag}
-                  onClick={() => toggleTag(tag)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
-                    selectedTags.includes(tag)
-                      ? 'bg-accent text-white'
-                      : 'glass hover:bg-white/5'
-                  }`}
-                >
-                  #{tag}
-                </button>
-              ))}
-            </div>
+            <TagFilter
+              allTags={allTags}
+              selectedTags={selectedTags}
+              onToggle={toggleTag}
+            />
           )}
         </div>
 

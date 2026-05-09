@@ -3,6 +3,40 @@ import { query } from '../config/database.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { aiService } from '../services/aiService.js';
 
+// Save a CAPTURE block as an idea, skipping duplicates by title (case-insensitive).
+// Returns the saved idea row or null if skipped.
+async function saveCapturedIdea(userId, capture, messageId) {
+  if (!capture.title?.trim()) return null;
+
+  // Dedup check — skip if this user already has an idea with the same title
+  const existing = await query(
+    `SELECT id FROM ideas WHERE user_id = $1 AND LOWER(title) = LOWER($2) LIMIT 1`,
+    [userId, capture.title.trim()]
+  );
+  if (existing.rows.length > 0) {
+    console.log(`[capture] Skipping duplicate idea: "${capture.title}"`);
+    return null;
+  }
+
+  const nextSteps = capture.next_steps?.length
+    ? `Next steps:\n${capture.next_steps.map(s => `- ${s}`).join('\n')}`
+    : null;
+
+  const result = await query(
+    `INSERT INTO ideas (user_id, title, summary, tags, notes, vibe, excitement, complexity, area_id, capture_message_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+    [
+      userId, capture.title.trim(), capture.summary || null,
+      JSON.stringify(capture.tags || []), nextSteps,
+      JSON.stringify(capture.vibe || []), capture.excitement || null,
+      capture.complexity || null,
+      await resolveAreaId(userId, capture.area),
+      messageId,
+    ]
+  );
+  return result.rows[0];
+}
+
 const router = express.Router();
 router.use(authenticateToken);
 
@@ -226,31 +260,12 @@ router.post('/chat', async (req, res) => {
           [userId, displayContent]
         );
 
-    // Save any captured ideas
+    // Save captured ideas — deduplication handled inside saveCapturedIdea
     const savedIdeas = [];
     for (const capture of captures) {
       try {
-        const nextSteps = capture.next_steps?.length
-          ? `Next steps:\n${capture.next_steps.map(s => `- ${s}`).join('\n')}`
-          : null;
-
-        const ideaResult = await query(
-          `INSERT INTO ideas (user_id, title, summary, tags, notes, vibe, excitement, complexity, area_id, capture_message_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-          [
-            userId,
-            capture.title,
-            capture.summary || null,
-            JSON.stringify(capture.tags || []),
-            nextSteps,
-            JSON.stringify(capture.vibe || []),
-            capture.excitement || null,
-            capture.complexity || null,
-            await resolveAreaId(userId, capture.area),
-            assistantMsg.rows[0].id,
-          ]
-        );
-        savedIdeas.push(ideaResult.rows[0]);
+        const idea = await saveCapturedIdea(userId, capture, assistantMsg.rows[0].id);
+        if (idea) savedIdeas.push(idea);
       } catch (e) {
         console.error('Failed to save captured idea:', e);
       }
@@ -357,24 +372,12 @@ router.post('/stream', async (req, res) => {
           [userId, displayContent]
         );
 
-    // Save captured ideas
+    // Save captured ideas — deduplication handled inside saveCapturedIdea
     const savedIdeas = [];
     for (const capture of captures) {
       try {
-        const nextSteps = capture.next_steps?.length
-          ? `Next steps:\n${capture.next_steps.map(s => `- ${s}`).join('\n')}`
-          : null;
-
-        const ideaResult = await query(
-          `INSERT INTO ideas (user_id, title, summary, tags, notes, vibe, excitement, complexity, area_id, capture_message_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-          [userId, capture.title, capture.summary || null,
-           JSON.stringify(capture.tags || []), nextSteps,
-           JSON.stringify(capture.vibe || []), capture.excitement || null,
-           capture.complexity || null, await resolveAreaId(userId, capture.area),
-           assistantMsg.rows[0].id]
-        );
-        savedIdeas.push(ideaResult.rows[0]);
+        const idea = await saveCapturedIdea(userId, capture, assistantMsg.rows[0].id);
+        if (idea) savedIdeas.push(idea);
       } catch (e) {
         console.error('Failed to save captured idea:', e);
       }

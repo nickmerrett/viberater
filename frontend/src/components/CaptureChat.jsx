@@ -85,7 +85,9 @@ export default function CaptureChat({ onNavigate }) {
   const syncingRef = useRef(false);
   const initialScrollDone = useRef(false);
 
-  useEffect(() => { loadHistory(sessionId); }, [sessionId]);
+  // Load all messages on mount — don't filter by sessionId so history is always visible
+  // Session ID is used when sending, not when loading the full thread
+  useEffect(() => { loadHistory(); }, []);
 
   useEffect(() => {
     if (!messages.length && !pendingMessages.length) return;
@@ -103,7 +105,7 @@ export default function CaptureChat({ onNavigate }) {
     }
   }, [isOnline]);
 
-  async function loadHistory(sid) {
+  async function loadHistory(sid = null) {
     try {
       const data = await api.getCaptureMessages(sid);
       setMessages(data.messages || []);

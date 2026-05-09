@@ -381,6 +381,46 @@ class APIClient {
     return this.request(`/reminders/${id}`, { method: 'DELETE' });
   }
 
+  // Research endpoints
+  async streamResearch(ideaId, title, summary, onEvent, onDone, onError) {
+    const token = localStorage.getItem('viberater_access_token');
+    const res = await fetch(`${this.baseURL}/research/idea`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ title, summary }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Request failed' }));
+      onError(err.error || 'Research failed');
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const event = JSON.parse(line.slice(6));
+          if (event.type === 'done') onDone(event);
+          else if (event.type === 'error') onError(event.message);
+          else onEvent(event);
+        } catch { /* skip malformed */ }
+      }
+    }
+  }
+
   // Share endpoints
   async getSharedIdea(token) {
     return fetch(`${this.baseURL}/share/${token}`).then(r => r.json());
