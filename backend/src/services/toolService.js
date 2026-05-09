@@ -104,15 +104,20 @@ export async function fetchUrl(url) {
     return 'Invalid URL';
   }
 
-  const res = await fetch(url, {
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; research-bot/1.0)' },
-    signal: AbortSignal.timeout(10000),
-  });
+  let res;
+  try {
+    res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; research-bot/1.0)' },
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch (err) {
+    return `Could not fetch ${url}: ${err.message} — skipping this source.`;
+  }
 
-  if (!res.ok) return `Failed to fetch ${url}: HTTP ${res.status}`;
+  if (!res.ok) return `Could not fetch ${url}: HTTP ${res.status} — skipping this source.`;
 
   const contentType = res.headers.get('content-type') || '';
-  if (!contentType.includes('text')) return `Cannot read content type: ${contentType}`;
+  if (!contentType.includes('text')) return `Could not read ${url}: unsupported content type — skipping.`;
 
   const html = await res.text();
   const text = stripHtml(html);
