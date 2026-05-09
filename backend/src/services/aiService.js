@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { toFile } from 'openai/uploads';
 
-const DEFAULT_CLAUDE_MODEL = DEFAULT_CLAUDE_MODEL;
+const DEFAULT_CLAUDE_MODEL = process.env.MODEL_PRIMARY || 'claude-sonnet-4-6';
 const DEFAULT_OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o';
 
 class AIService {

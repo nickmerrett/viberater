@@ -129,7 +129,11 @@ export async function query(text, params = []) {
         let sqliteParams = [...params];
 
         if (params && params.length > 0) {
-          sqliteQuery = text.replace(/\$(\d+)/g, '?');
+          sqliteParams = [];
+          sqliteQuery = text.replace(/\$(\d+)/g, (_, n) => {
+            sqliteParams.push(params[parseInt(n, 10) - 1]);
+            return '?';
+          });
         }
 
         // Convert PostgreSQL functions to SQLite equivalents
