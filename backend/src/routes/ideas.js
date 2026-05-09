@@ -93,12 +93,14 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Title is required' });
     }
 
+    const { area_id } = req.body;
+
     const result = await query(
       `INSERT INTO ideas (
         user_id, title, summary, transcript, conversation,
         vibe, excitement, complexity, tech_stack, notes, links, tags,
-        parent_idea_id, related_ideas
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        parent_idea_id, related_ideas, area_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING *`,
       [
         req.user.userId,
@@ -114,7 +116,8 @@ router.post('/', async (req, res) => {
         JSON.stringify(links || []),
         JSON.stringify(tags || []),
         parent_idea_id || null,
-        JSON.stringify(related_ideas || [])
+        JSON.stringify(related_ideas || []),
+        area_id || null,
       ]
     );
 
@@ -182,7 +185,7 @@ router.put('/:id', async (req, res) => {
         status, notes,
         links != null ? JSON.stringify(links) : null,
         tags != null ? JSON.stringify(tags) : null,
-        archived,
+        archived != null ? (archived ? 1 : 0) : null,
         related_ideas != null ? JSON.stringify(related_ideas) : null,
         parent_idea_id,
         req.params.id, req.user.userId
@@ -204,7 +207,7 @@ router.delete('/:id', async (req, res) => {
       [req.params.id, req.user.userId]
     );
 
-    if (result.rows.length === 0) {
+    if (result.rowCount === 0) {
       return res.status(404).json({ error: 'Idea not found' });
     }
 

@@ -209,25 +209,39 @@ export async function query(text, params = []) {
 
           const queryWithoutReturning = sqliteQuery.replace(/RETURNING\s+.+?(?:;|$)/i, '');
 
-          // Whitelist table name — only allow word chars (same as \w+ but explicit)
-          const rawTable = queryWithoutReturning.match(/INSERT\s+INTO\s+(\w+)/i)?.[1] ?? '';
+          const isUpdate = queryWithoutReturning.trim().toUpperCase().startsWith('UPDATE');
+
+          // Whitelist table name from INSERT or UPDATE
+          const rawTable = (
+            queryWithoutReturning.match(/INSERT\s+INTO\s+(\w+)/i)?.[1] ??
+            queryWithoutReturning.match(/UPDATE\s+(\w+)/i)?.[1] ??
+            ''
+          );
           const tableName = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(rawTable) ? rawTable : null;
 
           const info = db.prepare(queryWithoutReturning).run(...sqliteParams);
 
-          // Fetch the inserted/updated row
           let rows = [];
-          if (tableName && (info.lastInsertRowid || sqliteParams[0])) {
-              // If we generated a UUID, use it to fetch the row
-              if (isInsert && sqliteParams[0]) {
-                rows = db.prepare(`SELECT ${safeColumns} FROM ${tableName} WHERE id = ?`).all(sqliteParams[0]);
-              } else if (info.lastInsertRowid) {
-                rows = db.prepare(`SELECT ${safeColumns} FROM ${tableName} WHERE rowid = ?`).all(info.lastInsertRowid);
-              }
+
+          if (isInsert && tableName && (info.lastInsertRowid || sqliteParams[0])) {
+            // INSERT: fetch by UUID (injected as first param) or rowid
+            if (sqliteParams[0]) {
+              rows = db.prepare(`SELECT ${safeColumns} FROM ${tableName} WHERE id = ?`).all(sqliteParams[0]);
+            } else if (info.lastInsertRowid) {
+              rows = db.prepare(`SELECT ${safeColumns} FROM ${tableName} WHERE rowid = ?`).all(info.lastInsertRowid);
+            }
+            rows = rows.map(row => parseRow(row));
+          } else if (isUpdate && tableName && info.changes > 0) {
+            // UPDATE: re-run the WHERE clause as a SELECT to simulate RETURNING
+            const whereMatch = queryWithoutReturning.match(/WHERE\s+([\s\S]+)$/i);
+            if (whereMatch) {
+              // Count ? in the SET clause to find where WHERE params begin
+              const setMatch = queryWithoutReturning.match(/SET\s+([\s\S]+?)\s+WHERE/i);
+              const setParamCount = (setMatch?.[1].match(/\?/g) || []).length;
+              const whereParams = sqliteParams.slice(setParamCount);
+              rows = db.prepare(`SELECT ${safeColumns} FROM ${tableName} WHERE ${whereMatch[1]}`).all(...whereParams);
               rows = rows.map(row => parseRow(row));
-          } else {
-            // UPDATE/DELETE without RETURNING, or unsafe table name (should never happen)
-            rows = [];
+            }
           }
 
           resolve({ rows, rowCount: info.changes });

@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -45,7 +46,7 @@ export function generateAccessToken(userId, email) {
 
 export function generateRefreshToken(userId, deviceId) {
   return jwt.sign(
-    { userId, deviceId, type: 'refresh' },
+    { userId, deviceId, type: 'refresh', jti: crypto.randomUUID() },
     JWT_SECRET,
     { expiresIn: process.env.JWT_REFRESH_EXPIRY || '30d' }
   );
