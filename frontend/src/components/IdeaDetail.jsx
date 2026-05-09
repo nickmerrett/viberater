@@ -27,6 +27,7 @@ export default function IdeaDetail({
   const [editingTags, setEditingTags] = useState(false);
   const [tagsInput, setTagsInput] = useState((idea.tags || []).join(', '));
   const [localIdea, setLocalIdea] = useState(idea);
+  const [conversationExpanded, setConversationExpanded] = useState(false);
 
   async function saveTitle() {
     if (!titleInput.trim() || titleInput.trim() === localIdea.title) {
@@ -290,17 +291,25 @@ export default function IdeaDetail({
           {/* Conversation history */}
           {conversation && (
             <div className="glass rounded-xl p-4">
-              <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">💬 Conversation</h2>
-              <div className="space-y-3">
-                {conversation.map((msg, i) => (
-                  <div key={i} className="glass rounded-lg p-3">
-                    <div className="text-xs text-gray-500 mb-1 font-medium">
-                      {msg.role === 'user' ? '👤 You' : '🤖 AI'}
+              <button
+                className="flex items-center justify-between w-full text-left"
+                onClick={() => setConversationExpanded(e => !e)}
+              >
+                <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wider">💬 Conversation ({conversation.length})</h2>
+                <span className="text-gray-600 text-xs">{conversationExpanded ? '▲ collapse' : '▼ expand'}</span>
+              </button>
+              {conversationExpanded && (
+                <div className="space-y-3 mt-3">
+                  {conversation.map((msg, i) => (
+                    <div key={i} className="glass rounded-lg p-3">
+                      <div className="text-xs text-gray-500 mb-1 font-medium">
+                        {msg.role === 'user' ? '👤 You' : '🤖 AI'}
+                      </div>
+                      <div className="text-gray-200 text-sm whitespace-pre-wrap">{msg.content}</div>
                     </div>
-                    <div className="text-gray-200 text-sm whitespace-pre-wrap">{msg.content}</div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
