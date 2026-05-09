@@ -123,6 +123,7 @@ export default function CaptureChat({ onNavigate }) {
     setShowHistory(false);
     initialScrollDone.current = false;
     inputRef.current?.focus();
+    loadHistory(id);
   }
 
   async function openHistory() {
@@ -142,6 +143,7 @@ export default function CaptureChat({ onNavigate }) {
     setCapturedIdeas([]);
     setShowHistory(false);
     initialScrollDone.current = false;
+    loadHistory(sid);
   }
 
   function addSystemMsg(text) {
