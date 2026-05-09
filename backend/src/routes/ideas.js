@@ -13,8 +13,12 @@ router.get('/', async (req, res) => {
     const { status, limit = 50, offset = 0 } = req.query;
 
     let sql = `
-      SELECT * FROM ideas
-      WHERE user_id = $1
+      SELECT i.*,
+        (SELECT url FROM attachments
+         WHERE idea_id = i.id AND type = 'image'
+         ORDER BY created_at ASC LIMIT 1) AS thumbnail_url
+      FROM ideas i
+      WHERE i.user_id = $1
     `;
     const params = [req.user.userId];
 
@@ -28,7 +32,6 @@ router.get('/', async (req, res) => {
 
     const result = await query(sql, params);
 
-    // Get total count
     const countResult = await query(
       'SELECT COUNT(*) as count FROM ideas WHERE user_id = $1',
       [req.user.userId]

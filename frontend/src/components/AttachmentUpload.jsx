@@ -51,12 +51,10 @@ export default function AttachmentUpload({ ideaId, onUploaded }) {
     setUploading(true);
     setError(null);
     try {
-      // Attempt to fetch open-graph metadata via a simple fetch
       let meta = { title: null, description: null, favicon: null };
       try {
-        const domain = new URL(url).origin;
-        meta.favicon = `${domain}/favicon.ico`;
-        meta.title = new URL(url).hostname;
+        const preview = await api.fetchLinkPreview(url);
+        meta = { title: preview.title, description: preview.description, favicon: preview.favicon };
       } catch {}
 
       const result = await api.addLinkAttachment(ideaId, { url, ...meta });

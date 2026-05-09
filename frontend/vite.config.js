@@ -21,6 +21,11 @@ export default defineConfig({
         theme_color: '#7c3aed',
         background_color: '#030712',
         display: 'standalone',
+        share_target: {
+          action: '/share-target',
+          method: 'GET',
+          params: { title: 'title', text: 'text', url: 'url' },
+        },
         icons: [
           {
             src: '/icon.svg',

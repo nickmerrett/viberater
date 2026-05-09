@@ -24,7 +24,10 @@ export default function Dashboard() {
   const fetchAreas = useAreaStore(s => s.fetch);
   const activeArea = useAreaStore(s => s.activeArea);
   const { install, canInstall, isInstalled } = usePWAInstall();
-  const [activeTab, setActiveTab] = useState('capture');
+  const [activeTab, setActiveTab] = useState(() => {
+    const p = new URLSearchParams(window.location.search).get('tab');
+    return ['capture', 'ideas', 'projects', 'reminders'].includes(p) ? p : 'capture';
+  });
   const [showAreasSettings, setShowAreasSettings] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showConsole, setShowConsole] = useState(false);

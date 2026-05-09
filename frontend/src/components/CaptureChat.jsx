@@ -108,9 +108,11 @@ export default function CaptureChat({ onNavigate }) {
     bottomRef.current?.scrollIntoView({ behavior });
   }, [messages, pendingMessages]);
 
-  // When coming back online, flush the pending queue
+  // When coming back online, reload history and flush the pending queue
   useEffect(() => {
-    if (isOnline && pendingMessages.length > 0 && !syncingRef.current) {
+    if (!isOnline) return;
+    loadHistory();
+    if (pendingMessages.length > 0 && !syncingRef.current) {
       flushPending();
     }
   }, [isOnline]);
@@ -397,7 +399,8 @@ export default function CaptureChat({ onNavigate }) {
   const hasPending = pendingMessages.length > 0;
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col items-center">
+      <div className="w-full max-w-[800px] flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 flex-shrink-0">
         <span className="text-xs text-gray-500 font-medium tracking-wide uppercase">Capture</span>
@@ -602,6 +605,7 @@ export default function CaptureChat({ onNavigate }) {
           {isOnline ? 'Enter to send · Shift+Enter for new line' : 'Offline · messages queued locally'}
         </p>
       </div>}
+      </div>
     </div>
   );
 }

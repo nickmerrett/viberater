@@ -519,7 +519,7 @@ export default function IdeasView({ activeArea = null }) {
                 className="card cursor-pointer hover:border-white/20 transition-all active:scale-[0.99]"
                 onClick={() => openIdea(idea)}
               >
-                <div className="flex items-start justify-between mb-1.5">
+                <div className="flex items-start justify-between mb-1.5 gap-3">
                   <div className="flex-1 min-w-0">
                     <h3 className="text-base font-semibold leading-snug truncate">{idea.title}</h3>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -529,9 +529,18 @@ export default function IdeasView({ activeArea = null }) {
                       {idea.area_id && <AreaBadge areaId={idea.area_id} />}
                     </div>
                   </div>
-                  <span className="text-base flex-shrink-0 ml-2">
-                    {idea.status === 'promoted-to-project' ? '🚀' : '💡'}
-                  </span>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {idea.thumbnail_url && (
+                      <img
+                        src={idea.thumbnail_url}
+                        alt=""
+                        className="w-12 h-12 rounded-lg object-cover border border-white/10"
+                      />
+                    )}
+                    <span className="text-base">
+                      {idea.status === 'promoted-to-project' ? '🚀' : '💡'}
+                    </span>
+                  </div>
                 </div>
 
                 {idea.summary && (

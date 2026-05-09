@@ -487,6 +487,13 @@ class APIClient {
     return response.json();
   }
 
+  async fetchLinkPreview(url) {
+    return this.request('/attachments/fetch-preview', {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    });
+  }
+
   async addLinkAttachment(ideaId, linkData) {
     return this.request(`/attachments/link/${ideaId}`, {
       method: 'POST',

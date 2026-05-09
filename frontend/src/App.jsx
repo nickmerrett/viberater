@@ -5,6 +5,7 @@ import { useDataStore } from './store/useDataStore';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import SharedIdea from './pages/SharedIdea';
+import ShareTarget from './pages/ShareTarget';
 import ErrorBoundary from './components/ErrorBoundary';
 
 function ProtectedRoute({ children }) {
@@ -14,7 +15,7 @@ function ProtectedRoute({ children }) {
 
 function App() {
   useEffect(() => {
-    if (window.location.pathname.startsWith('/share')) return;
+    if (window.location.pathname.startsWith('/share') || window.location.pathname.startsWith('/share-target')) return;
     const init = async () => {
       try {
         console.log('[App] Initializing database...');
@@ -33,6 +34,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/share/:token" element={<SharedIdea />} />
+          <Route path="/share-target" element={<ShareTarget />} />
           <Route
             path="/"
             element={

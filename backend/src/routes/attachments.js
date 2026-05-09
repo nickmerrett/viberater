@@ -41,6 +41,45 @@ const upload = multer({
   },
 });
 
+// POST /api/attachments/fetch-preview — scrape OG metadata for a URL (server-side to avoid CORS)
+router.post('/fetch-preview', async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: 'URL required' });
+  try { new URL(url); } catch { return res.status(400).json({ error: 'Invalid URL' }); }
+
+  try {
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; viberater-bot/1.0)' },
+      signal: AbortSignal.timeout(5000),
+      redirect: 'follow',
+    });
+    const html = await response.text();
+
+    const og = (prop) => {
+      const m = html.match(new RegExp(`<meta[^>]+property=["']og:${prop}["'][^>]+content=["']([^"']+)["']`, 'i'))
+               || html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:${prop}["']`, 'i'));
+      return m?.[1] || null;
+    };
+    const meta = (name) => {
+      const m = html.match(new RegExp(`<meta[^>]+name=["']${name}["'][^>]+content=["']([^"']+)["']`, 'i'))
+               || html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+name=["']${name}["']`, 'i'));
+      return m?.[1] || null;
+    };
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+
+    const domain = new URL(url).origin;
+    res.json({
+      title: og('title') || meta('twitter:title') || titleMatch?.[1]?.trim() || null,
+      description: og('description') || meta('description') || null,
+      image: og('image') || null,
+      favicon: `${domain}/favicon.ico`,
+    });
+  } catch {
+    const domain = new URL(url).origin;
+    res.json({ title: null, description: null, image: null, favicon: `${domain}/favicon.ico` });
+  }
+});
+
 // GET /api/attachments/idea/:ideaId
 router.get('/idea/:ideaId', async (req, res) => {
   try {
