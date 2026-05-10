@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { api } from '../services/api';
 
-export default function ResearchPanel({ idea }) {
-  const [state, setState] = useState('idle'); // idle | running | done | error
+export default function ResearchPanel({ idea, onResearchSaved }) {
+  const [state, setState] = useState(idea.research ? 'done' : 'idle');
   const [events, setEvents] = useState([]);
-  const [answer, setAnswer] = useState('');
+  const [answer, setAnswer] = useState(idea.research || '');
 
   function reset() {
     setState('idle');
@@ -35,7 +35,17 @@ export default function ResearchPanel({ idea }) {
           setAnswer(accumulated);
         }
       },
-      () => setState('done'),
+      async () => {
+        setState('done');
+        if (accumulated) {
+          try {
+            await api.updateIdea(idea.id, { research: accumulated });
+            onResearchSaved?.(accumulated);
+          } catch {
+            // save failed silently — result still visible in UI
+          }
+        }
+      },
       (err) => { setEvents(prev => [...prev, { type: 'error', message: err }]); setState('error'); }
     );
   }
@@ -58,7 +68,7 @@ export default function ResearchPanel({ idea }) {
             <div key={i} className="text-xs font-mono">
               {e.type === 'call' && (
                 <div className="flex items-center gap-2 text-gray-400">
-                  <span className="animate-pulse text-primary">
+                  <span className={state === 'running' && !e.result ? 'animate-pulse text-primary' : ''}>
                     {e.name === 'web_search' ? '🔍' : '🌐'}
                   </span>
                   <span>
@@ -66,7 +76,7 @@ export default function ResearchPanel({ idea }) {
                       ? `Searching: "${e.args.query}"`
                       : `Fetching: ${e.args.url}`}
                   </span>
-                  {!e.result && <span className="animate-pulse">…</span>}
+                  {!e.result && state === 'running' && <span className="animate-pulse">…</span>}
                   {e.result && <span className="text-green-500/60">✓</span>}
                 </div>
               )}
@@ -76,7 +86,7 @@ export default function ResearchPanel({ idea }) {
             </div>
           ))}
 
-          {/* Streaming answer */}
+          {/* Answer */}
           {answer && (
             <div className="glass rounded-xl p-4 border border-white/10">
               <p className="text-sm leading-relaxed whitespace-pre-wrap text-gray-200">

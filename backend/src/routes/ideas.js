@@ -149,7 +149,8 @@ router.put('/:id', async (req, res) => {
       tags,
       archived,
       related_ideas,
-      parent_idea_id
+      parent_idea_id,
+      research
     } = req.body;
 
     // Verify ownership
@@ -178,8 +179,9 @@ router.put('/:id', async (req, res) => {
         tags = COALESCE($12, tags),
         archived = COALESCE($13, archived),
         related_ideas = COALESCE($14, related_ideas),
-        parent_idea_id = COALESCE($15, parent_idea_id)
-      WHERE id = $16 AND user_id = $17
+        parent_idea_id = COALESCE($15, parent_idea_id),
+        research = COALESCE($16, research)
+      WHERE id = $17 AND user_id = $18
       RETURNING *`,
       [
         title, summary, transcript, conversation,
@@ -191,6 +193,7 @@ router.put('/:id', async (req, res) => {
         archived != null ? (archived ? 1 : 0) : null,
         related_ideas != null ? JSON.stringify(related_ideas) : null,
         parent_idea_id,
+        research ?? null,
         req.params.id, req.user.userId
       ]
     );

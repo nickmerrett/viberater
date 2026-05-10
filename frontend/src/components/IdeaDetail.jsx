@@ -429,7 +429,10 @@ export default function IdeaDetail({
           {/* Research */}
           <div className="glass rounded-xl p-4">
             <h3 className="text-sm font-medium text-gray-400 mb-3">Validate idea</h3>
-            <ResearchPanel idea={localIdea} />
+            <ResearchPanel
+              idea={localIdea}
+              onResearchSaved={text => setLocalIdea(prev => ({ ...prev, research: text }))}
+            />
           </div>
 
           {/* Share */}
