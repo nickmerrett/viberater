@@ -52,7 +52,17 @@ function makeConfig() {
     client: 'better-sqlite3',
     connection: { filename: file },
     useNullAsDefault: true,
-    pool: { min: 1, max: 1 },  // better-sqlite3 is synchronous
+    pool: {
+      min: 1, max: 1,
+      // Set PRAGMAs synchronously when the connection is first created — avoids
+      // fire-and-forget pool races that caused migration deadlocks.
+      afterCreate: (conn, done) => {
+        conn.pragma('journal_mode = WAL');
+        conn.pragma('foreign_keys = ON');
+        console.log('✓ Connected to SQLite');
+        done(null, conn);
+      },
+    },
   };
 }
 
@@ -65,12 +75,9 @@ export const db = knex({
   },
 });
 
-// Verify connection on startup
+// Verify PostgreSQL connection on startup
 if (DB_TYPE === 'postgres') {
   db.raw('SELECT 1').then(() => console.log('✓ Connected to PostgreSQL')).catch(console.error);
-} else {
-  db.raw('PRAGMA journal_mode = WAL').then(() => {}).catch(console.error);
-  db.raw('PRAGMA foreign_keys = ON').then(() => console.log('✓ Connected to SQLite')).catch(console.error);
 }
 
 export const generateUUID = () => uuidv4();
