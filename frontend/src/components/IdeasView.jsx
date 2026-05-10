@@ -35,6 +35,7 @@ export default function IdeasView({ activeArea = null }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState([]);
   const [sortBy, setSortBy] = useState('newest');
+  const [showFilters, setShowFilters] = useState(false);
   const [showNewIdea, setShowNewIdea] = useState(false);
   const [refiningIdea, setRefiningIdea] = useState(null);
   const [viewingIdea, setViewingIdea] = useState(null);
@@ -401,6 +402,15 @@ export default function IdeasView({ activeArea = null }) {
           {/* Action Buttons */}
           <div className="flex gap-1.5">
             <button
+              onClick={() => setShowFilters(f => !f)}
+              className={`relative glass px-2.5 py-1.5 rounded-lg transition-all text-xs font-medium ${showFilters ? 'bg-white/10' : 'hover:bg-white/5'}`}
+            >
+              ⚙️
+              {(filter !== 'active' || sortBy !== 'newest' || selectedTags.length > 0) && (
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-primary" />
+              )}
+            </button>
+            <button
               onClick={() => setShowIdeation(true)}
               className="glass px-2.5 py-1.5 rounded-lg hover:bg-accent/20 hover:text-accent transition-all text-xs font-medium"
             >
@@ -415,72 +425,52 @@ export default function IdeasView({ activeArea = null }) {
           </div>
         </div>
 
-        <div className="flex items-center gap-4 flex-wrap">
-          {/* Sort Dropdown */}
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="glass px-3 py-2 rounded-lg text-sm"
-          >
-            <option value="newest">Newest First</option>
-            <option value="oldest">Oldest First</option>
-            <option value="updated">Recently Updated</option>
-            <option value="excitement">Most Exciting</option>
-          </select>
+        {showFilters && (
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Sort Dropdown */}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="glass px-2.5 py-1.5 rounded-lg text-xs"
+            >
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="updated">Updated</option>
+              <option value="excitement">Excitement</option>
+            </select>
 
-          {/* Status Filters */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => setFilter('active')}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                filter === 'active'
-                  ? 'bg-gradient-primary text-white shadow-lg shadow-primary/40'
-                  : 'glass hover:bg-white/5'
-              }`}
-            >
-              Active
-            </button>
-            <button
-              onClick={() => setFilter('refined')}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                filter === 'refined'
-                  ? 'bg-gradient-primary text-white shadow-lg shadow-primary/40'
-                  : 'glass hover:bg-white/5'
-              }`}
-            >
-              ✨ Refined
-            </button>
-            <button
-              onClick={() => setFilter('promoted')}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                filter === 'promoted'
-                  ? 'bg-gradient-primary text-white shadow-lg shadow-primary/40'
-                  : 'glass hover:bg-white/5'
-              }`}
-            >
-              🚀 Promoted
-            </button>
-            <button
-              onClick={() => setFilter('archived')}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                filter === 'archived'
-                  ? 'bg-gradient-primary text-white shadow-lg shadow-primary/40'
-                  : 'glass hover:bg-white/5'
-              }`}
-            >
-              📦 Archived
-            </button>
+            {/* Status Filters */}
+            <div className="flex gap-1.5">
+              {[
+                { value: 'active', label: 'Active' },
+                { value: 'refined', label: '✨' },
+                { value: 'promoted', label: '🚀' },
+                { value: 'archived', label: '📦' },
+              ].map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => setFilter(value)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    filter === value
+                      ? 'bg-gradient-primary text-white shadow-lg shadow-primary/40'
+                      : 'glass hover:bg-white/5'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Tag Filters */}
+            {allTags.length > 0 && (
+              <TagFilter
+                allTags={allTags}
+                selectedTags={selectedTags}
+                onToggle={toggleTag}
+              />
+            )}
           </div>
-
-          {/* Tag Filters */}
-          {allTags.length > 0 && (
-            <TagFilter
-              allTags={allTags}
-              selectedTags={selectedTags}
-              onToggle={toggleTag}
-            />
-          )}
-        </div>
+        )}
 
         {/* Active Filters Display */}
         {(searchQuery || selectedTags.length > 0) && (
