@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api } from '../services/api';
+import { useAreaStore } from '../store/useAreaStore';
 import AreaBadge from './AreaBadge';
 import DesignDocument from './DesignDocument';
 import AttachmentList from './AttachmentList';
@@ -30,6 +31,7 @@ export default function IdeaDetail({
   const [editInput, setEditInput] = useState('');
   const [localIdea, setLocalIdea] = useState(idea);
   const [conversationExpanded, setConversationExpanded] = useState(false);
+  const areas = useAreaStore(s => s.areas);
 
   async function saveTitle() {
     if (!titleInput.trim() || titleInput.trim() === localIdea.title) {
@@ -141,7 +143,20 @@ export default function IdeaDetail({
               {localIdea.title}
             </h1>
           )}
-          {localIdea.area_id && <AreaBadge areaId={localIdea.area_id} className="mt-0.5" />}
+          {areas.length > 0 && (
+            <select
+              value={localIdea.area_id || ''}
+              onChange={async e => {
+                const area_id = e.target.value || null;
+                await onUpdate(localIdea.id, { area_id });
+                setLocalIdea(prev => ({ ...prev, area_id }));
+              }}
+              className="text-xs text-gray-400 bg-transparent border-none outline-none cursor-pointer hover:text-white transition-colors mt-0.5"
+            >
+              <option value="">No area</option>
+              {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          )}
         </div>
 
         <span className="text-xl flex-shrink-0">

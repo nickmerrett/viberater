@@ -152,6 +152,8 @@ router.put('/:id', async (req, res) => {
       parent_idea_id,
       research
     } = req.body;
+    const hasAreaUpdate = 'area_id' in req.body;
+    const area_id = req.body.area_id || null;
 
     // Verify ownership
     const existing = await query(
@@ -180,8 +182,9 @@ router.put('/:id', async (req, res) => {
         archived = COALESCE($13, archived),
         related_ideas = COALESCE($14, related_ideas),
         parent_idea_id = COALESCE($15, parent_idea_id),
-        research = COALESCE($16, research)
-      WHERE id = $17 AND user_id = $18
+        research = COALESCE($16, research),
+        area_id = CASE WHEN $17::boolean THEN $18 ELSE area_id END
+      WHERE id = $19 AND user_id = $20
       RETURNING *`,
       [
         title, summary, transcript, conversation,
@@ -194,6 +197,7 @@ router.put('/:id', async (req, res) => {
         related_ideas != null ? JSON.stringify(related_ideas) : null,
         parent_idea_id,
         research ?? null,
+        hasAreaUpdate, area_id,
         req.params.id, req.user.userId
       ]
     );
