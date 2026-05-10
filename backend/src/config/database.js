@@ -76,8 +76,19 @@ if (DB_TYPE === 'postgres') {
 export const generateUUID = () => uuidv4();
 
 // Run raw SQL (used by migrations)
+// knex.raw() uses better-sqlite3's prepare() which rejects multi-statement SQL.
+// For SQLite we split on statement boundaries and run each one separately.
 export async function executeSql(sql) {
-  return db.raw(sql);
+  if (DB_TYPE === 'postgres') {
+    return db.raw(sql);
+  }
+  const statements = sql
+    .split(/;[ \t]*(?:\r?\n|$)/)
+    .map(s => s.trim())
+    .filter(s => s && !s.startsWith('--') && !/^\/\*/.test(s));
+  for (const stmt of statements) {
+    await db.raw(stmt);
+  }
 }
 
 export async function getDbType() {
