@@ -91,8 +91,8 @@ export async function executeSql(sql) {
   }
   const statements = sql
     .split(/;[ \t]*(?:\r?\n|$)/)
-    .map(s => s.trim())
-    .filter(s => s && !s.startsWith('--') && !/^\/\*/.test(s));
+    .map(s => s.replace(/^(\s*--[^\n]*\n|\s*\n)*/g, '').trim())
+    .filter(Boolean);
   for (const stmt of statements) {
     await db.raw(stmt);
   }
