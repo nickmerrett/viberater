@@ -85,7 +85,7 @@ spec:
               echo "=== Installing build tools for native modules ==="
               apk add --no-cache --quiet python3 make g++
               echo "=== Installing dependencies ==="
-              npm ci
+              npm install
               echo "=== Running backend tests ==="
               npm test
               echo "=== Backend tests passed ==="
@@ -110,7 +110,7 @@ spec:
               #!/bin/sh
               set -e
               echo "=== Installing dependencies ==="
-              npm ci
+              npm install
               echo "=== Running frontend tests ==="
               npm test -- --run
               echo "=== Frontend tests passed ==="
