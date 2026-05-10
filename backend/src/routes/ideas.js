@@ -24,7 +24,7 @@ router.get('/', async (req, res) => {
 
     if (status) {
       params.push(status);
-      sql += ` AND status = $${params.length}`;
+      sql += ` AND i.status = $${params.length}`;
     }
 
     sql += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
@@ -183,7 +183,7 @@ router.put('/:id', async (req, res) => {
         related_ideas = COALESCE($14, related_ideas),
         parent_idea_id = COALESCE($15, parent_idea_id),
         research = COALESCE($16, research),
-        area_id = CASE WHEN $17::boolean THEN $18 ELSE area_id END
+        area_id = CASE WHEN $17 THEN $18 ELSE area_id END
       WHERE id = $19 AND user_id = $20
       RETURNING *`,
       [
@@ -197,7 +197,7 @@ router.put('/:id', async (req, res) => {
         related_ideas != null ? JSON.stringify(related_ideas) : null,
         parent_idea_id,
         research ?? null,
-        hasAreaUpdate, area_id,
+        hasAreaUpdate ? 1 : 0, area_id,
         req.params.id, req.user.userId
       ]
     );
