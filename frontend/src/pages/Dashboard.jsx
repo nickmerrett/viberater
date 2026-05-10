@@ -206,9 +206,9 @@ export default function Dashboard() {
         {activeTab === 'projects' && <ProjectsView activeArea={activeArea} />}
         {activeTab === 'reminders' && <RemindersView activeArea={activeArea} />}
 
-        {/* Version Footer — tap 5× to open debug console */}
+        {/* Version Footer — tap 5× to open debug console (hidden on capture tab to avoid overlap) */}
         <div
-          className="absolute bottom-0 left-0 p-3 text-xs text-gray-600 select-none cursor-default"
+          className={`absolute bottom-0 left-0 p-3 text-xs text-gray-600 select-none cursor-default ${activeTab === 'capture' ? 'invisible' : ''}`}
           onClick={() => {
             const now = Date.now();
             const key = '_dbgTaps';
