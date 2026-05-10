@@ -1,47 +1,39 @@
 import express from 'express';
-import { query } from '../config/database.js';
+import { db, generateUUID } from '../config/database.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
-
-// All routes require authentication
 router.use(authenticateToken);
+
+const userId = req => req.user.userId;
+
+function serialize(val) {
+  return val != null ? JSON.stringify(val) : undefined;
+}
 
 // Get all ideas
 router.get('/', async (req, res) => {
   try {
     const { status, limit = 50, offset = 0 } = req.query;
 
-    let sql = `
-      SELECT i.*,
-        (SELECT url FROM attachments
-         WHERE idea_id = i.id AND type = 'image'
-         ORDER BY created_at ASC LIMIT 1) AS thumbnail_url
-      FROM ideas i
-      WHERE i.user_id = $1
-    `;
-    const params = [req.user.userId];
+    const q = db('ideas as i')
+      .select('i.*', db.raw(
+        '(SELECT url FROM attachments WHERE idea_id = i.id AND type = ? ORDER BY created_at ASC LIMIT 1) AS thumbnail_url',
+        ['image']
+      ))
+      .where('i.user_id', userId(req))
+      .orderBy('i.created_at', 'desc')
+      .limit(parseInt(limit))
+      .offset(parseInt(offset));
 
-    if (status) {
-      params.push(status);
-      sql += ` AND i.status = $${params.length}`;
-    }
+    if (status) q.where('i.status', status);
 
-    sql += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-    params.push(parseInt(limit), parseInt(offset));
+    const [ideas, [{ count }]] = await Promise.all([
+      q,
+      db('ideas').where({ user_id: userId(req) }).count('* as count'),
+    ]);
 
-    const result = await query(sql, params);
-
-    const countResult = await query(
-      'SELECT COUNT(*) as count FROM ideas WHERE user_id = $1',
-      [req.user.userId]
-    );
-
-    res.json({
-      ideas: result.rows,
-      total: parseInt(countResult.rows[0].count),
-      page: Math.floor(offset / limit) + 1
-    });
+    res.json({ ideas, total: parseInt(count), page: Math.floor(offset / limit) + 1 });
   } catch (error) {
     console.error('Get ideas error:', error);
     res.status(500).json({ error: 'Failed to fetch ideas' });
@@ -51,22 +43,10 @@ router.get('/', async (req, res) => {
 // Get single idea
 router.get('/:id', async (req, res) => {
   try {
-    const result = await query(
-      'SELECT * FROM ideas WHERE id = $1 AND user_id = $2',
-      [req.params.id, req.user.userId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Idea not found' });
-    }
-
-    // Update last_viewed_at
-    await query(
-      'UPDATE ideas SET last_viewed_at = NOW() WHERE id = $1',
-      [req.params.id]
-    );
-
-    res.json({ idea: result.rows[0] });
+    const idea = await db('ideas').where({ id: req.params.id, user_id: userId(req) }).first();
+    if (!idea) return res.status(404).json({ error: 'Idea not found' });
+    await db('ideas').where({ id: req.params.id }).update({ last_viewed_at: new Date() });
+    res.json({ idea });
   } catch (error) {
     console.error('Get idea error:', error);
     res.status(500).json({ error: 'Failed to fetch idea' });
@@ -76,133 +56,74 @@ router.get('/:id', async (req, res) => {
 // Create idea
 router.post('/', async (req, res) => {
   try {
-    const {
+    const { title, summary, transcript, conversation, vibe, excitement, complexity,
+            techStack, notes, links, tags, parent_idea_id, related_ideas, area_id } = req.body;
+
+    if (!title) return res.status(400).json({ error: 'Title is required' });
+
+    const [idea] = await db('ideas').insert({
+      id: generateUUID(),
+      user_id: userId(req),
       title,
-      summary,
-      transcript,
-      conversation,
-      vibe,
-      excitement,
-      complexity,
-      techStack,
-      notes,
-      links,
-      tags,
-      parent_idea_id,
-      related_ideas
-    } = req.body;
+      summary: summary || null,
+      transcript: transcript || null,
+      conversation: serialize(conversation) ?? null,
+      vibe: JSON.stringify(vibe || []),
+      excitement: excitement || null,
+      complexity: complexity || null,
+      tech_stack: JSON.stringify(techStack || []),
+      notes: notes || null,
+      links: JSON.stringify(links || []),
+      tags: JSON.stringify(tags || []),
+      parent_idea_id: parent_idea_id || null,
+      related_ideas: JSON.stringify(related_ideas || []),
+      area_id: area_id || null,
+    }).returning('*');
 
-    if (!title) {
-      return res.status(400).json({ error: 'Title is required' });
-    }
-
-    const { area_id } = req.body;
-
-    const result = await query(
-      `INSERT INTO ideas (
-        user_id, title, summary, transcript, conversation,
-        vibe, excitement, complexity, tech_stack, notes, links, tags,
-        parent_idea_id, related_ideas, area_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-      RETURNING *`,
-      [
-        req.user.userId,
-        title,
-        summary || null,
-        transcript || null,
-        conversation || null,
-        JSON.stringify(vibe || []),
-        excitement || null,
-        complexity || null,
-        JSON.stringify(techStack || []),
-        notes || null,
-        JSON.stringify(links || []),
-        JSON.stringify(tags || []),
-        parent_idea_id || null,
-        JSON.stringify(related_ideas || []),
-        area_id || null,
-      ]
-    );
-
-    res.status(201).json({ idea: result.rows[0] });
+    res.status(201).json({ idea });
   } catch (error) {
     console.error('Create idea error:', error);
     res.status(500).json({ error: 'Failed to create idea' });
   }
 });
 
-// Update idea
+// Update idea — only fields present in body are updated
 router.put('/:id', async (req, res) => {
   try {
-    const {
-      title,
-      summary,
-      transcript,
-      conversation,
-      vibe,
-      excitement,
-      complexity,
-      techStack,
-      status,
-      notes,
-      links,
-      tags,
-      archived,
-      related_ideas,
-      parent_idea_id,
-      research
-    } = req.body;
-    const hasAreaUpdate = 'area_id' in req.body;
-    const area_id = req.body.area_id || null;
+    const exists = await db('ideas').where({ id: req.params.id, user_id: userId(req) }).first();
+    if (!exists) return res.status(404).json({ error: 'Idea not found' });
 
-    // Verify ownership
-    const existing = await query(
-      'SELECT id FROM ideas WHERE id = $1 AND user_id = $2',
-      [req.params.id, req.user.userId]
-    );
+    const body = req.body;
+    const updates = {};
 
-    if (existing.rows.length === 0) {
-      return res.status(404).json({ error: 'Idea not found' });
+    if (body.title        !== undefined) updates.title         = body.title;
+    if (body.summary      !== undefined) updates.summary       = body.summary;
+    if (body.transcript   !== undefined) updates.transcript    = body.transcript;
+    if (body.conversation !== undefined) updates.conversation  = JSON.stringify(body.conversation);
+    if (body.vibe         !== undefined) updates.vibe          = JSON.stringify(body.vibe);
+    if (body.excitement   !== undefined) updates.excitement    = body.excitement;
+    if (body.complexity   !== undefined) updates.complexity    = body.complexity;
+    if (body.techStack    !== undefined) updates.tech_stack    = JSON.stringify(body.techStack);
+    if (body.status       !== undefined) updates.status        = body.status;
+    if (body.notes        !== undefined) updates.notes         = body.notes;
+    if (body.links        !== undefined) updates.links         = JSON.stringify(body.links);
+    if (body.tags         !== undefined) updates.tags          = JSON.stringify(body.tags);
+    if (body.archived     !== undefined) updates.archived      = body.archived ? 1 : 0;
+    if (body.related_ideas   !== undefined) updates.related_ideas  = JSON.stringify(body.related_ideas);
+    if (body.parent_idea_id  !== undefined) updates.parent_idea_id = body.parent_idea_id;
+    if (body.research     !== undefined) updates.research      = body.research;
+    if ('area_id'         in  body)      updates.area_id       = body.area_id || null;
+
+    if (!Object.keys(updates).length) {
+      return res.json({ idea: exists });
     }
 
-    const result = await query(
-      `UPDATE ideas SET
-        title = COALESCE($1, title),
-        summary = COALESCE($2, summary),
-        transcript = COALESCE($3, transcript),
-        conversation = COALESCE($4, conversation),
-        vibe = COALESCE($5, vibe),
-        excitement = COALESCE($6, excitement),
-        complexity = COALESCE($7, complexity),
-        tech_stack = COALESCE($8, tech_stack),
-        status = COALESCE($9, status),
-        notes = COALESCE($10, notes),
-        links = COALESCE($11, links),
-        tags = COALESCE($12, tags),
-        archived = COALESCE($13, archived),
-        related_ideas = COALESCE($14, related_ideas),
-        parent_idea_id = COALESCE($15, parent_idea_id),
-        research = COALESCE($16, research),
-        area_id = CASE WHEN $17 THEN $18 ELSE area_id END
-      WHERE id = $19 AND user_id = $20
-      RETURNING *`,
-      [
-        title, summary, transcript, conversation,
-        vibe != null ? JSON.stringify(vibe) : null, excitement, complexity,
-        techStack != null ? JSON.stringify(techStack) : null,
-        status, notes,
-        links != null ? JSON.stringify(links) : null,
-        tags != null ? JSON.stringify(tags) : null,
-        archived != null ? (archived ? 1 : 0) : null,
-        related_ideas != null ? JSON.stringify(related_ideas) : null,
-        parent_idea_id,
-        research ?? null,
-        hasAreaUpdate ? 1 : 0, area_id,
-        req.params.id, req.user.userId
-      ]
-    );
+    const [idea] = await db('ideas')
+      .where({ id: req.params.id, user_id: userId(req) })
+      .update(updates)
+      .returning('*');
 
-    res.json({ idea: result.rows[0] });
+    res.json({ idea });
   } catch (error) {
     console.error('Update idea error:', error);
     res.status(500).json({ error: 'Failed to update idea' });
@@ -212,15 +133,8 @@ router.put('/:id', async (req, res) => {
 // Delete idea
 router.delete('/:id', async (req, res) => {
   try {
-    const result = await query(
-      'DELETE FROM ideas WHERE id = $1 AND user_id = $2 RETURNING id',
-      [req.params.id, req.user.userId]
-    );
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'Idea not found' });
-    }
-
+    const deleted = await db('ideas').where({ id: req.params.id, user_id: userId(req) }).del();
+    if (!deleted) return res.status(404).json({ error: 'Idea not found' });
     res.json({ success: true });
   } catch (error) {
     console.error('Delete idea error:', error);
@@ -228,45 +142,25 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// Save refined idea from AI conversation
+// Save refined idea
 router.patch('/:id/refine', async (req, res) => {
   try {
+    const exists = await db('ideas').where({ id: req.params.id, user_id: userId(req) }).first();
+    if (!exists) return res.status(404).json({ error: 'Idea not found' });
+
     const { conversation, refinedData } = req.body;
+    const updates = { conversation: JSON.stringify(conversation), status: refinedData?.status || 'refined' };
+    if (refinedData?.summary)        updates.summary        = refinedData.summary;
+    if (refinedData?.designDocument) updates.design_document = refinedData.designDocument;
+    if (refinedData?.techStack)      updates.tech_stack      = refinedData.techStack;
+    if (refinedData?.notes)          updates.notes           = refinedData.notes;
 
-    // Verify ownership
-    const existing = await query(
-      'SELECT id FROM ideas WHERE id = $1 AND user_id = $2',
-      [req.params.id, req.user.userId]
-    );
+    const [idea] = await db('ideas')
+      .where({ id: req.params.id, user_id: userId(req) })
+      .update(updates)
+      .returning('*');
 
-    if (existing.rows.length === 0) {
-      return res.status(404).json({ error: 'Idea not found' });
-    }
-
-    // Update idea with refined conversation and extracted data
-    const result = await query(
-      `UPDATE ideas SET
-        conversation = $1,
-        summary = COALESCE($2, summary),
-        design_document = COALESCE($3, design_document),
-        tech_stack = COALESCE($4, tech_stack),
-        notes = COALESCE($5, notes),
-        status = COALESCE($6, status)
-      WHERE id = $7 AND user_id = $8
-      RETURNING *`,
-      [
-        JSON.stringify(conversation),
-        refinedData?.summary,
-        refinedData?.designDocument,
-        refinedData?.techStack,
-        refinedData?.notes,
-        refinedData?.status || 'refined',
-        req.params.id,
-        req.user.userId
-      ]
-    );
-
-    res.json({ idea: result.rows[0] });
+    res.json({ idea });
   } catch (error) {
     console.error('Refine idea error:', error);
     res.status(500).json({ error: 'Failed to save refined idea' });
@@ -276,94 +170,46 @@ router.patch('/:id/refine', async (req, res) => {
 // Promote idea to project
 router.post('/:id/promote', async (req, res) => {
   try {
-    const {
-      projectTitle,
-      projectDescription,
-      goals,
-      phases,
-      initialTasks,
-      techStack,
-      estimatedDuration
-    } = req.body;
+    const idea = await db('ideas').where({ id: req.params.id, user_id: userId(req) }).first();
+    if (!idea) return res.status(404).json({ error: 'Idea not found' });
 
-    // Get the idea
-    const ideaResult = await query(
-      'SELECT * FROM ideas WHERE id = $1 AND user_id = $2',
-      [req.params.id, req.user.userId]
-    );
+    const { projectTitle, projectDescription, goals, phases, initialTasks, techStack, estimatedDuration } = req.body;
 
-    if (ideaResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Idea not found' });
+    const projectPlan = { goals: goals || [], phases: phases || [], estimatedDuration: estimatedDuration || null };
+
+    const [project] = await db('projects').insert({
+      id: generateUUID(),
+      user_id: userId(req),
+      origin_idea_id: idea.id,
+      title: projectTitle || idea.title,
+      description: projectDescription || idea.summary,
+      tech_stack: JSON.stringify(techStack || idea.tech_stack || []),
+      vibe: JSON.stringify(idea.vibe || []),
+      excitement: idea.excitement,
+      status: 'planning',
+      project_plan: JSON.stringify(projectPlan),
+    }).returning('*');
+
+    if (initialTasks?.length) {
+      await db('tasks').insert(
+        initialTasks.map((t, i) => ({
+          id: generateUUID(),
+          project_id: project.id,
+          title: t.title,
+          description: t.description || null,
+          priority: t.priority || 'medium',
+          estimated_minutes: t.estimatedMinutes || null,
+          ai_generated: 1,
+          sort_order: i + 1,
+        }))
+      );
     }
 
-    const idea = ideaResult.rows[0];
+    await db('ideas').where({ id: idea.id }).update({ status: 'promoted-to-project', project_id: project.id });
 
-    // Build project plan JSONB
-    const projectPlan = {
-      goals: goals || [],
-      phases: phases || [],
-      estimatedDuration: estimatedDuration || null
-    };
+    const tasks = await db('tasks').where({ project_id: project.id }).orderBy('sort_order');
 
-    // Create project from idea
-    const projectResult = await query(
-      `INSERT INTO projects (
-        user_id, origin_idea_id, title, description,
-        tech_stack, vibe, excitement, status, project_plan
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'planning', $8)
-      RETURNING *`,
-      [
-        req.user.userId,
-        idea.id,
-        projectTitle || idea.title,
-        projectDescription || idea.summary,
-        techStack || idea.tech_stack || [],
-        idea.vibe || [],
-        idea.excitement,
-        JSON.stringify(projectPlan)
-      ]
-    );
-
-    const project = projectResult.rows[0];
-
-    // Create initial tasks if provided
-    if (initialTasks && initialTasks.length > 0) {
-      for (let i = 0; i < initialTasks.length; i++) {
-        const task = initialTasks[i];
-        await query(
-          `INSERT INTO tasks (
-            project_id, title, description, priority,
-            estimated_minutes, ai_generated, sort_order
-          ) VALUES ($1, $2, $3, $4, $5, true, $6)`,
-          [
-            project.id,
-            task.title,
-            task.description || null,
-            task.priority || 'medium',
-            task.estimatedMinutes || null,
-            i + 1
-          ]
-        );
-      }
-    }
-
-    // Update idea status and link to project
-    await query(
-      `UPDATE ideas SET status = 'promoted-to-project', project_id = $1
-       WHERE id = $2`,
-      [project.id, idea.id]
-    );
-
-    // Fetch tasks for the response
-    const tasksResult = await query(
-      'SELECT * FROM tasks WHERE project_id = $1 ORDER BY sort_order',
-      [project.id]
-    );
-
-    res.status(201).json({
-      project,
-      tasks: tasksResult.rows
-    });
+    res.status(201).json({ project, tasks });
   } catch (error) {
     console.error('Promote idea error:', error);
     res.status(500).json({ error: 'Failed to promote idea' });

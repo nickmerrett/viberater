@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
-import { query } from '../config/database.js';
+import { db, generateUUID } from '../config/database.js';
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -25,67 +25,39 @@ function tokenExpiresAt() {
 // Register
 router.post('/register', async (req, res) => {
   try {
-    // Gate registration behind env flag
     if (process.env.ALLOW_REGISTRATION === 'false') {
       return res.status(403).json({ error: 'Registration is disabled' });
     }
 
     const { email, password, name } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password required' });
-    }
+    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+    if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Invalid email address' });
+    if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    if (password.length > 128) return res.status(400).json({ error: 'Password too long' });
+    if (name && name.length > 100) return res.status(400).json({ error: 'Name too long' });
 
-    if (!EMAIL_RE.test(email)) {
-      return res.status(400).json({ error: 'Invalid email address' });
-    }
-
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' });
-    }
-
-    if (password.length > 128) {
-      return res.status(400).json({ error: 'Password too long' });
-    }
-
-    if (name && name.length > 100) {
-      return res.status(400).json({ error: 'Name too long' });
-    }
-
-    const existingUser = await query(
-      'SELECT id FROM users WHERE email = $1',
-      [email.toLowerCase()]
-    );
-
-    if (existingUser.rows.length > 0) {
-      return res.status(409).json({ error: 'Email already registered' });
-    }
+    const existing = await db('users').where({ email: email.toLowerCase() }).first();
+    if (existing) return res.status(409).json({ error: 'Email already registered' });
 
     const passwordHash = await bcrypt.hash(password, 10);
-
-    const result = await query(
-      `INSERT INTO users (email, name, password_hash)
-       VALUES ($1, $2, $3)
-       RETURNING id, email, name, created_at`,
-      [email.toLowerCase(), name || null, passwordHash]
-    );
-
-    const user = result.rows[0];
+    const [user] = await db('users')
+      .insert({ id: generateUUID(), email: email.toLowerCase(), name: name || null, password_hash: passwordHash })
+      .returning(['id', 'email', 'name', 'created_at']);
 
     const accessToken = generateAccessToken(user.id, user.email);
     const refreshToken = generateRefreshToken(user.id, null);
 
-    await query(
-      `INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)`,
-      [user.id, hashToken(refreshToken), tokenExpiresAt()]
-    );
+    await db('refresh_tokens').insert({
+      id: generateUUID(), user_id: user.id,
+      token: hashToken(refreshToken), expires_at: tokenExpiresAt(),
+    });
 
     await bootstrapAreas(user.id);
 
     res.status(201).json({
       user: { id: user.id, email: user.email, name: user.name },
-      accessToken,
-      refreshToken,
+      accessToken, refreshToken,
     });
   } catch (error) {
     console.error('Register error:', error);
@@ -98,55 +70,46 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password, deviceId, deviceName } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password required' });
-    }
+    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+    if (password.length > 128) return res.status(400).json({ error: 'Invalid credentials' });
 
-    if (password.length > 128) {
-      return res.status(400).json({ error: 'Invalid credentials' });
-    }
+    const user = await db('users')
+      .where({ email: email.toLowerCase() })
+      .select('id', 'email', 'name', 'password_hash')
+      .first();
 
-    const result = await query(
-      'SELECT id, email, name, password_hash FROM users WHERE email = $1',
-      [email.toLowerCase()]
-    );
+    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
-    if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    const user = result.rows[0];
-
-    const validPassword = await bcrypt.compare(password, user.password_hash);
-    if (!validPassword) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 
     let dbDeviceId = null;
     if (deviceId && typeof deviceId === 'string' && deviceId.length <= 255) {
-      const deviceResult = await query(
-        `INSERT INTO devices (user_id, device_id, device_name, last_sync_at)
-         VALUES ($1, $2, $3, NOW())
-         ON CONFLICT (user_id, device_id)
-         DO UPDATE SET device_name = $3, last_sync_at = NOW()
-         RETURNING id`,
-        [user.id, deviceId, (deviceName || 'Unknown Device').slice(0, 100)]
-      );
-      dbDeviceId = deviceResult.rows[0].id;
+      const [device] = await db('devices')
+        .insert({
+          id: generateUUID(),
+          user_id: user.id,
+          device_id: deviceId,
+          device_name: (deviceName || 'Unknown Device').slice(0, 100),
+          last_sync_at: new Date(),
+        })
+        .onConflict(['user_id', 'device_id'])
+        .merge({ device_name: (deviceName || 'Unknown Device').slice(0, 100), last_sync_at: new Date() })
+        .returning('id');
+      dbDeviceId = device?.id ?? null;
     }
 
     const accessToken = generateAccessToken(user.id, user.email);
     const refreshToken = generateRefreshToken(user.id, dbDeviceId);
 
-    await query(
-      `INSERT INTO refresh_tokens (user_id, token, device_id, expires_at) VALUES ($1, $2, $3, $4)`,
-      [user.id, hashToken(refreshToken), dbDeviceId, tokenExpiresAt()]
-    );
+    await db('refresh_tokens').insert({
+      id: generateUUID(), user_id: user.id,
+      token: hashToken(refreshToken), device_id: dbDeviceId, expires_at: tokenExpiresAt(),
+    });
 
     res.json({
       user: { id: user.id, email: user.email, name: user.name },
-      accessToken,
-      refreshToken,
+      accessToken, refreshToken,
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -158,40 +121,29 @@ router.post('/login', async (req, res) => {
 router.post('/refresh', async (req, res) => {
   try {
     const { refreshToken } = req.body;
+    if (!refreshToken) return res.status(400).json({ error: 'Refresh token required' });
 
-    if (!refreshToken) {
-      return res.status(400).json({ error: 'Refresh token required' });
-    }
-
-    // Verify JWT signature + type before hitting DB
     verifyRefreshToken(refreshToken);
 
     const tokenHash = hashToken(refreshToken);
+    const row = await db('refresh_tokens as rt')
+      .join('users as u', 'rt.user_id', 'u.id')
+      .where('rt.token', tokenHash)
+      .where('rt.expires_at', '>', new Date())
+      .select('rt.user_id', 'rt.device_id', 'u.email')
+      .first();
 
-    const result = await query(
-      `SELECT rt.*, u.email FROM refresh_tokens rt
-       JOIN users u ON rt.user_id = u.id
-       WHERE rt.token = $1 AND rt.expires_at > NOW()`,
-      [tokenHash]
-    );
+    if (!row) return res.status(403).json({ error: 'Invalid or expired refresh token' });
 
-    if (result.rows.length === 0) {
-      return res.status(403).json({ error: 'Invalid or expired refresh token' });
-    }
+    const newRefreshToken = generateRefreshToken(row.user_id, row.device_id);
 
-    const { user_id, email, device_id } = result.rows[0];
+    await db('refresh_tokens').where({ token: tokenHash }).del();
+    await db('refresh_tokens').insert({
+      id: generateUUID(), user_id: row.user_id,
+      token: hashToken(newRefreshToken), device_id: row.device_id || null, expires_at: tokenExpiresAt(),
+    });
 
-    // Rotate: issue new token, delete old hash
-    const newRefreshToken = generateRefreshToken(user_id, device_id);
-
-    await query('DELETE FROM refresh_tokens WHERE token = $1', [tokenHash]);
-    await query(
-      `INSERT INTO refresh_tokens (user_id, token, device_id, expires_at) VALUES ($1, $2, $3, $4)`,
-      [user_id, hashToken(newRefreshToken), device_id || null, tokenExpiresAt()]
-    );
-
-    const accessToken = generateAccessToken(user_id, email);
-
+    const accessToken = generateAccessToken(row.user_id, row.email);
     res.json({ accessToken, refreshToken: newRefreshToken });
   } catch (error) {
     console.error('Token refresh error:', error);
@@ -203,11 +155,7 @@ router.post('/refresh', async (req, res) => {
 router.post('/logout', async (req, res) => {
   try {
     const { refreshToken } = req.body;
-
-    if (refreshToken) {
-      await query('DELETE FROM refresh_tokens WHERE token = $1', [hashToken(refreshToken)]);
-    }
-
+    if (refreshToken) await db('refresh_tokens').where({ token: hashToken(refreshToken) }).del();
     res.json({ success: true });
   } catch (error) {
     console.error('Logout error:', error);
@@ -218,17 +166,12 @@ router.post('/logout', async (req, res) => {
 // Get current user
 router.get('/me', authenticateToken, async (req, res) => {
   try {
-    const result = await query(
-      `SELECT id, email, name, created_at, settings, subscription, ai_provider
-       FROM users WHERE id = $1`,
-      [req.user.userId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    res.json({ user: result.rows[0] });
+    const user = await db('users')
+      .where({ id: req.user.userId })
+      .select('id', 'email', 'name', 'created_at', 'settings', 'subscription', 'ai_provider')
+      .first();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ user });
   } catch (error) {
     console.error('Get user error:', error);
     res.status(500).json({ error: 'Failed to get user' });

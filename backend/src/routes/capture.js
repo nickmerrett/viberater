@@ -1,19 +1,27 @@
 import express from 'express';
-import { query } from '../config/database.js';
+import { db, generateUUID } from '../config/database.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { aiService } from '../services/aiService.js';
 
-// Save a CAPTURE block as an idea, skipping duplicates by title (case-insensitive).
-// Returns the saved idea row or null if skipped.
+const router = express.Router();
+router.use(authenticateToken);
+
+const RETENTION_DAYS = 60;
+const CONTEXT_MESSAGES = 40;
+
+function retentionCutoff() {
+  const d = new Date();
+  d.setDate(d.getDate() - RETENTION_DAYS);
+  return d;
+}
+
 async function saveCapturedIdea(userId, capture, messageId) {
   if (!capture.title?.trim()) return null;
 
-  // Dedup check — skip if this user already has an idea with the same title
-  const existing = await query(
-    `SELECT id FROM ideas WHERE user_id = $1 AND LOWER(title) = LOWER($2) LIMIT 1`,
-    [userId, capture.title.trim()]
-  );
-  if (existing.rows.length > 0) {
+  const existing = await db('ideas')
+    .whereRaw('user_id = ? AND LOWER(title) = LOWER(?)', [userId, capture.title.trim()])
+    .first();
+  if (existing) {
     console.log(`[capture] Skipping duplicate idea: "${capture.title}"`);
     return null;
   }
@@ -22,38 +30,33 @@ async function saveCapturedIdea(userId, capture, messageId) {
     ? `Next steps:\n${capture.next_steps.map(s => `- ${s}`).join('\n')}`
     : null;
 
-  const result = await query(
-    `INSERT INTO ideas (user_id, title, summary, tags, notes, vibe, excitement, complexity, area_id, capture_message_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-    [
-      userId, capture.title.trim(), capture.summary || null,
-      JSON.stringify(capture.tags || []), nextSteps,
-      JSON.stringify(capture.vibe || []), capture.excitement || null,
-      capture.complexity || null,
-      await resolveAreaId(userId, capture.area),
-      messageId,
-    ]
-  );
-  return result.rows[0];
+  const areaId = await resolveAreaId(userId, capture.area);
+
+  const [idea] = await db('ideas').insert({
+    id: generateUUID(),
+    user_id: userId,
+    title: capture.title.trim(),
+    summary: capture.summary || null,
+    tags: JSON.stringify(capture.tags || []),
+    notes: nextSteps,
+    vibe: JSON.stringify(capture.vibe || []),
+    excitement: capture.excitement || null,
+    complexity: capture.complexity || null,
+    area_id: areaId,
+    capture_message_id: messageId,
+  }).returning('*');
+
+  return idea;
 }
-
-const router = express.Router();
-router.use(authenticateToken);
-
-const RETENTION_DAYS = 60;
-const CONTEXT_MESSAGES = 40;
 
 async function resolveAreaId(userId, areaName) {
   if (!areaName) return null;
   try {
-    const result = await query(
-      `SELECT id FROM areas WHERE user_id = $1 AND LOWER(name) = LOWER($2) LIMIT 1`,
-      [userId, areaName]
-    );
-    return result.rows[0]?.id || null;
-  } catch {
-    return null;
-  }
+    const area = await db('areas')
+      .whereRaw('user_id = ? AND LOWER(name) = LOWER(?)', [userId, areaName])
+      .first();
+    return area?.id || null;
+  } catch { return null; }
 }
 
 function buildSystemPrompt(areas, recentIdeas) {
@@ -120,68 +123,68 @@ If the user is just chatting or asking something (not capturing an idea), respon
 After captures: acknowledge briefly ("got both of those") and stay in the conversation naturally.`;
 }
 
-// Get conversation history — scoped to a session if session_id provided
+// GET /capture/messages
 router.get('/messages', async (req, res) => {
   try {
     const { session_id } = req.query;
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - RETENTION_DAYS);
+    const q = db('capture_messages')
+      .where({ user_id: req.user.userId })
+      .where('created_at', '>', retentionCutoff())
+      .select('id', 'role', 'content', 'created_at')
+      .orderBy('created_at');
 
-    let result;
-    if (session_id) {
-      result = await query(
-        `SELECT id, role, content, created_at FROM capture_messages
-         WHERE user_id = $1 AND session_id = $2 AND created_at > $3
-         ORDER BY created_at ASC`,
-        [req.user.userId, session_id, cutoff.toISOString()]
-      );
-    } else {
-      result = await query(
-        `SELECT id, role, content, created_at FROM capture_messages
-         WHERE user_id = $1 AND created_at > $2
-         ORDER BY created_at ASC`,
-        [req.user.userId, cutoff.toISOString()]
-      );
-    }
+    if (session_id) q.where({ session_id });
 
-    res.json({ messages: result.rows });
+    res.json({ messages: await q });
   } catch (error) {
     console.error('Get capture messages error:', error);
     res.status(500).json({ error: 'Failed to fetch messages' });
   }
 });
 
-// List past capture sessions (distinct session_ids) with a preview
+// GET /capture/sessions
 router.get('/sessions', async (req, res) => {
   try {
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - RETENTION_DAYS);
+    const sessions = await db('capture_messages as m1')
+      .where({ 'm1.user_id': req.user.userId })
+      .whereNotNull('m1.session_id')
+      .where('m1.created_at', '>', retentionCutoff())
+      .select('m1.session_id')
+      .min('m1.created_at as started_at')
+      .max('m1.created_at as last_message_at')
+      .count('* as message_count')
+      .select(
+        db.raw(`(SELECT content FROM capture_messages m2
+                 WHERE m2.session_id = m1.session_id AND m2.user_id = ?
+                   AND m2.role = 'user'
+                 ORDER BY m2.created_at ASC LIMIT 1) AS preview`, [req.user.userId])
+      )
+      .groupBy('m1.session_id')
+      .orderBy('last_message_at', 'desc');
 
-    const result = await query(
-      `SELECT
-         session_id,
-         MIN(created_at) AS started_at,
-         MAX(created_at) AS last_message_at,
-         COUNT(*) AS message_count,
-         (SELECT content FROM capture_messages m2
-          WHERE m2.session_id = m1.session_id AND m2.user_id = $1
-            AND m2.role = 'user'
-          ORDER BY m2.created_at ASC LIMIT 1) AS preview
-       FROM capture_messages m1
-       WHERE user_id = $1 AND session_id IS NOT NULL AND created_at > $2
-       GROUP BY session_id
-       ORDER BY last_message_at DESC`,
-      [req.user.userId, cutoff.toISOString()]
-    );
-
-    res.json({ sessions: result.rows });
+    res.json({ sessions });
   } catch (error) {
     console.error('Get capture sessions error:', error);
     res.status(500).json({ error: 'Failed to fetch sessions' });
   }
 });
 
-// Send a message
+async function getContext(userId, sessionId) {
+  const [areas, recentIdeas, history] = await Promise.all([
+    db('areas').where({ user_id: userId }).select('name').orderBy('sort_order'),
+    db('ideas').where({ user_id: userId }).select('title', 'created_at').orderBy('created_at', 'desc').limit(20),
+    db('capture_messages')
+      .where({ user_id: userId })
+      .where('created_at', '>', retentionCutoff())
+      .modify(q => { if (sessionId) q.where({ session_id: sessionId }); })
+      .select('role', 'content')
+      .orderBy('created_at')
+      .limit(CONTEXT_MESSAGES),
+  ]);
+  return { areas, recentIdeas, history };
+}
+
+// POST /capture/chat
 router.post('/chat', async (req, res) => {
   try {
     const { content, session_id } = req.body;
@@ -189,95 +192,45 @@ router.post('/chat', async (req, res) => {
 
     const userId = req.user.userId;
 
-    // Save user message
-    const userMsg = session_id
-      ? await query(
-          `INSERT INTO capture_messages (user_id, role, content, session_id) VALUES ($1, 'user', $2, $3) RETURNING *`,
-          [userId, content.trim(), session_id]
-        )
-      : await query(
-          `INSERT INTO capture_messages (user_id, role, content) VALUES ($1, 'user', $2) RETURNING *`,
-          [userId, content.trim()]
-        );
+    const [userMsg] = await db('capture_messages').insert({
+      id: generateUUID(),
+      user_id: userId,
+      role: 'user',
+      content: content.trim(),
+      session_id: session_id || null,
+    }).returning('*');
 
-    // Get recent history for AI context (scoped to session if provided)
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - RETENTION_DAYS);
-
-    const history = session_id
-      ? await query(
-          `SELECT role, content FROM capture_messages
-           WHERE user_id = $1 AND session_id = $2 AND created_at > $3
-           ORDER BY created_at ASC LIMIT $4`,
-          [userId, session_id, cutoff.toISOString(), CONTEXT_MESSAGES]
-        )
-      : await query(
-          `SELECT role, content FROM capture_messages
-           WHERE user_id = $1 AND created_at > $2
-           ORDER BY created_at ASC LIMIT $3`,
-          [userId, cutoff.toISOString(), CONTEXT_MESSAGES]
-        );
-
-    // Get user's areas
-    let areas = [];
-    try {
-      const areasResult = await query(
-        `SELECT name FROM areas WHERE user_id = $1 ORDER BY sort_order ASC`,
-        [userId]
-      );
-      areas = areasResult.rows;
-    } catch {
-      // areas table may not exist yet
-    }
-
-    // Get recent ideas for cross-reference
-    const recentIdeas = await query(
-      `SELECT title, created_at FROM ideas WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
-      [userId]
-    );
-
-    const systemPrompt = buildSystemPrompt(areas, recentIdeas.rows);
-    const aiMessages = history.rows.map(m => ({ role: m.role, content: m.content }));
+    const { areas, recentIdeas, history } = await getContext(userId, session_id);
+    const systemPrompt = buildSystemPrompt(areas, recentIdeas);
+    const aiMessages = history.map(m => ({ role: m.role, content: m.content }));
 
     const aiResponse = await aiService.chatRaw(aiMessages, { systemPrompt });
     const fullContent = aiResponse.content;
 
-    // Parse and strip CAPTURE blocks — robust to multiline JSON
     const captures = [];
     const displayContent = fullContent.replace(/CAPTURE:(\{[\s\S]*?\})(?=\n|$)/gm, (_, json) => {
-      try { captures.push(JSON.parse(json)); } catch { /* skip malformed */ }
+      try { captures.push(JSON.parse(json)); } catch {}
       return '';
     }).trim();
 
-    // Save assistant message
-    const assistantMsg = session_id
-      ? await query(
-          `INSERT INTO capture_messages (user_id, role, content, session_id) VALUES ($1, 'assistant', $2, $3) RETURNING *`,
-          [userId, displayContent, session_id]
-        )
-      : await query(
-          `INSERT INTO capture_messages (user_id, role, content) VALUES ($1, 'assistant', $2) RETURNING *`,
-          [userId, displayContent]
-        );
+    const [assistantMsg] = await db('capture_messages').insert({
+      id: generateUUID(),
+      user_id: userId,
+      role: 'assistant',
+      content: displayContent,
+      session_id: session_id || null,
+    }).returning('*');
 
-    // Save captured ideas — deduplication handled inside saveCapturedIdea
     const savedIdeas = [];
     for (const capture of captures) {
       try {
-        const idea = await saveCapturedIdea(userId, capture, assistantMsg.rows[0].id);
+        const idea = await saveCapturedIdea(userId, capture, assistantMsg.id);
         if (idea) savedIdeas.push(idea);
-      } catch (e) {
-        console.error('Failed to save captured idea:', e);
-      }
+      } catch (e) { console.error('Failed to save captured idea:', e); }
     }
 
     res.json({
-      message: {
-        id: assistantMsg.rows[0].id,
-        role: 'assistant',
-        content: displayContent,
-        created_at: assistantMsg.rows[0].created_at,
-      },
+      message: { id: assistantMsg.id, role: 'assistant', content: displayContent, created_at: assistantMsg.created_at },
       captured: savedIdeas,
     });
   } catch (error) {
@@ -286,14 +239,13 @@ router.post('/chat', async (req, res) => {
   }
 });
 
-// Streaming chat endpoint — SSE
+// POST /capture/stream — SSE
 router.post('/stream', async (req, res) => {
   const { content, session_id } = req.body;
   if (!content?.trim()) return res.status(400).json({ error: 'Message content required' });
 
   const userId = req.user.userId;
 
-  // SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -302,93 +254,50 @@ router.post('/stream', async (req, res) => {
   const send = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 
   try {
-    // Save user message
-    if (session_id) {
-      await query(
-        `INSERT INTO capture_messages (user_id, role, content, session_id) VALUES ($1, 'user', $2, $3)`,
-        [userId, content.trim(), session_id]
-      );
-    } else {
-      await query(
-        `INSERT INTO capture_messages (user_id, role, content) VALUES ($1, 'user', $2)`,
-        [userId, content.trim()]
-      );
-    }
+    await db('capture_messages').insert({
+      id: generateUUID(),
+      user_id: userId,
+      role: 'user',
+      content: content.trim(),
+      session_id: session_id || null,
+    });
 
-    // Get history (scoped to session if provided)
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - RETENTION_DAYS);
-    const history = session_id
-      ? await query(
-          `SELECT role, content FROM capture_messages
-           WHERE user_id = $1 AND session_id = $2 AND created_at > $3
-           ORDER BY created_at ASC LIMIT $4`,
-          [userId, session_id, cutoff.toISOString(), CONTEXT_MESSAGES]
-        )
-      : await query(
-          `SELECT role, content FROM capture_messages
-           WHERE user_id = $1 AND created_at > $2
-           ORDER BY created_at ASC LIMIT $3`,
-          [userId, cutoff.toISOString(), CONTEXT_MESSAGES]
-        );
+    const { areas, recentIdeas, history } = await getContext(userId, session_id);
+    const systemPrompt = buildSystemPrompt(areas, recentIdeas);
+    const aiMessages = history.map(m => ({ role: m.role, content: m.content }));
 
-    // Get areas and recent ideas for context
-    let areas = [];
-    try {
-      const ar = await query(`SELECT name FROM areas WHERE user_id = $1 ORDER BY sort_order ASC`, [userId]);
-      areas = ar.rows;
-    } catch { /* areas table may not exist yet */ }
-
-    const recentIdeas = await query(
-      `SELECT title, created_at FROM ideas WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
-      [userId]
-    );
-
-    const systemPrompt = buildSystemPrompt(areas, recentIdeas.rows);
-    const aiMessages = history.rows.map(m => ({ role: m.role, content: m.content }));
-
-    // Stream tokens to client
     let fullContent = '';
     await aiService.streamRaw(aiMessages, { systemPrompt }, (token) => {
       fullContent += token;
       send({ type: 'token', text: token });
     });
 
-    // Parse CAPTURE blocks — handle both single-line and multiline JSON
     const captures = [];
     const displayContent = fullContent.replace(/CAPTURE:(\{[\s\S]*?\})(?=\n|$)/gm, (_, json) => {
-      try { captures.push(JSON.parse(json)); } catch { /* skip malformed */ }
+      try { captures.push(JSON.parse(json)); } catch {}
       return '';
     }).trim();
 
-    // Save assistant message
-    const assistantMsg = session_id
-      ? await query(
-          `INSERT INTO capture_messages (user_id, role, content, session_id) VALUES ($1, 'assistant', $2, $3) RETURNING *`,
-          [userId, displayContent, session_id]
-        )
-      : await query(
-          `INSERT INTO capture_messages (user_id, role, content) VALUES ($1, 'assistant', $2) RETURNING *`,
-          [userId, displayContent]
-        );
+    const [assistantMsg] = await db('capture_messages').insert({
+      id: generateUUID(),
+      user_id: userId,
+      role: 'assistant',
+      content: displayContent,
+      session_id: session_id || null,
+    }).returning('*');
 
-    // Save captured ideas — deduplication handled inside saveCapturedIdea
     const savedIdeas = [];
     for (const capture of captures) {
       try {
-        const idea = await saveCapturedIdea(userId, capture, assistantMsg.rows[0].id);
+        const idea = await saveCapturedIdea(userId, capture, assistantMsg.id);
         if (idea) savedIdeas.push(idea);
-      } catch (e) {
-        console.error('Failed to save captured idea:', e);
-      }
+      } catch (e) { console.error('Failed to save captured idea:', e); }
     }
 
-    // Final event — include clean content so frontend can strip CAPTURE blocks
-    // that were already streamed as raw tokens
     send({
       type: 'done',
-      messageId: assistantMsg.rows[0].id,
-      created_at: assistantMsg.rows[0].created_at,
+      messageId: assistantMsg.id,
+      created_at: assistantMsg.created_at,
       content: displayContent,
       captured: savedIdeas,
     });

@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs-extra';
 import crypto from 'crypto';
-import { query } from '../config/database.js';
+import { db, generateUUID } from '../config/database.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -13,10 +13,8 @@ const STORAGE_DIR = process.env.STORAGE_ROOT
   ? path.join(process.env.STORAGE_ROOT, '..', 'attachments')
   : './storage/attachments';
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const ALLOWED_MIME = [
-  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
-];
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
 
 await fs.ensureDir(STORAGE_DIR);
 
@@ -41,7 +39,7 @@ const upload = multer({
   },
 });
 
-// POST /api/attachments/fetch-preview — scrape OG metadata for a URL (server-side to avoid CORS)
+// POST /api/attachments/fetch-preview
 router.post('/fetch-preview', async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'URL required' });
@@ -66,8 +64,8 @@ router.post('/fetch-preview', async (req, res) => {
       return m?.[1] || null;
     };
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-
     const domain = new URL(url).origin;
+
     res.json({
       title: og('title') || meta('twitter:title') || titleMatch?.[1]?.trim() || null,
       description: og('description') || meta('description') || null,
@@ -83,91 +81,77 @@ router.post('/fetch-preview', async (req, res) => {
 // GET /api/attachments/idea/:ideaId
 router.get('/idea/:ideaId', async (req, res) => {
   try {
-    const result = await query(
-      `SELECT * FROM attachments WHERE idea_id = $1 AND user_id = $2 ORDER BY created_at ASC`,
-      [req.params.ideaId, req.user.userId]
-    );
-    res.json({ attachments: result.rows.map(parseAttachment) });
+    const rows = await db('attachments')
+      .where({ idea_id: req.params.ideaId, user_id: req.user.userId })
+      .orderBy('created_at');
+    res.json({ attachments: rows.map(parseAttachment) });
   } catch (error) {
     console.error('Get attachments error:', error);
     res.status(500).json({ error: 'Failed to fetch attachments' });
   }
 });
 
-// POST /api/attachments/upload/:ideaId — image upload
+// POST /api/attachments/upload/:ideaId
 router.post('/upload/:ideaId', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file provided' });
 
-    // Verify idea belongs to user
-    const idea = await query(
-      'SELECT id FROM ideas WHERE id = $1 AND user_id = $2',
-      [req.params.ideaId, req.user.userId]
-    );
-    if (idea.rows.length === 0) return res.status(404).json({ error: 'Idea not found' });
+    const idea = await db('ideas').where({ id: req.params.ideaId, user_id: req.user.userId }).first();
+    if (!idea) return res.status(404).json({ error: 'Idea not found' });
 
     const fileUrl = `/api/attachments/file/${req.user.userId}/${req.file.filename}`;
+    const [row] = await db('attachments').insert({
+      id: generateUUID(),
+      idea_id: req.params.ideaId,
+      user_id: req.user.userId,
+      type: 'image',
+      url: fileUrl,
+      filename: req.file.originalname,
+      size: req.file.size,
+      mime_type: req.file.mimetype,
+    }).returning('*');
 
-    const result = await query(
-      `INSERT INTO attachments (idea_id, user_id, type, url, filename, size, mime_type)
-       VALUES ($1, $2, 'image', $3, $4, $5, $6) RETURNING *`,
-      [req.params.ideaId, req.user.userId, fileUrl,
-       req.file.originalname, req.file.size, req.file.mimetype]
-    );
-
-    res.status(201).json({ attachment: parseAttachment(result.rows[0]) });
+    res.status(201).json({ attachment: parseAttachment(row) });
   } catch (error) {
     console.error('Upload error:', error);
     res.status(500).json({ error: error.message || 'Upload failed' });
   }
 });
 
-// POST /api/attachments/link/:ideaId — save a link
+// POST /api/attachments/link/:ideaId
 router.post('/link/:ideaId', async (req, res) => {
   try {
     const { url, title, description, favicon } = req.body;
     if (!url) return res.status(400).json({ error: 'URL required' });
-
-    // Basic URL validation
     try { new URL(url); } catch { return res.status(400).json({ error: 'Invalid URL' }); }
 
-    const idea = await query(
-      'SELECT id FROM ideas WHERE id = $1 AND user_id = $2',
-      [req.params.ideaId, req.user.userId]
-    );
-    if (idea.rows.length === 0) return res.status(404).json({ error: 'Idea not found' });
+    const idea = await db('ideas').where({ id: req.params.ideaId, user_id: req.user.userId }).first();
+    if (!idea) return res.status(404).json({ error: 'Idea not found' });
 
-    const metadata = JSON.stringify({ title, description, favicon });
+    const [row] = await db('attachments').insert({
+      id: generateUUID(),
+      idea_id: req.params.ideaId,
+      user_id: req.user.userId,
+      type: 'link',
+      url,
+      filename: title || url,
+      metadata: JSON.stringify({ title, description, favicon }),
+    }).returning('*');
 
-    const result = await query(
-      `INSERT INTO attachments (idea_id, user_id, type, url, filename, metadata)
-       VALUES ($1, $2, 'link', $3, $4, $5) RETURNING *`,
-      [req.params.ideaId, req.user.userId, url, title || url, metadata]
-    );
-
-    res.status(201).json({ attachment: parseAttachment(result.rows[0]) });
+    res.status(201).json({ attachment: parseAttachment(row) });
   } catch (error) {
     console.error('Link attachment error:', error);
     res.status(500).json({ error: 'Failed to save link' });
   }
 });
 
-// GET /api/attachments/file/:userId/:filename — serve file
+// GET /api/attachments/file/:userId/:filename
 router.get('/file/:userId/:filename', async (req, res) => {
   try {
-    // Only serve files belonging to the authenticated user
-    if (req.params.userId !== req.user.userId) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-
-    // Sanitise filename — no path traversal
+    if (req.params.userId !== req.user.userId) return res.status(403).json({ error: 'Forbidden' });
     const filename = path.basename(req.params.filename);
     const filePath = path.join(STORAGE_DIR, req.params.userId, filename);
-
-    if (!await fs.pathExists(filePath)) {
-      return res.status(404).json({ error: 'File not found' });
-    }
-
+    if (!await fs.pathExists(filePath)) return res.status(404).json({ error: 'File not found' });
     res.sendFile(path.resolve(filePath));
   } catch (error) {
     console.error('Serve file error:', error);
@@ -178,23 +162,15 @@ router.get('/file/:userId/:filename', async (req, res) => {
 // DELETE /api/attachments/:id
 router.delete('/:id', async (req, res) => {
   try {
-    const result = await query(
-      'SELECT * FROM attachments WHERE id = $1 AND user_id = $2',
-      [req.params.id, req.user.userId]
-    );
+    const attachment = await db('attachments').where({ id: req.params.id, user_id: req.user.userId }).first();
+    if (!attachment) return res.status(404).json({ error: 'Attachment not found' });
 
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Attachment not found' });
-
-    const attachment = result.rows[0];
-
-    // Delete file from disk if it's an image we stored
     if (attachment.type === 'image' && attachment.url.startsWith('/api/attachments/file/')) {
       const filename = path.basename(attachment.url);
-      const filePath = path.join(STORAGE_DIR, req.user.userId, filename);
-      await fs.remove(filePath).catch(() => {});
+      await fs.remove(path.join(STORAGE_DIR, req.user.userId, filename)).catch(() => {});
     }
 
-    await query('DELETE FROM attachments WHERE id = $1', [req.params.id]);
+    await db('attachments').where({ id: req.params.id }).del();
     res.json({ success: true });
   } catch (error) {
     console.error('Delete attachment error:', error);
@@ -205,7 +181,9 @@ router.delete('/:id', async (req, res) => {
 function parseAttachment(row) {
   return {
     ...row,
-    metadata: row.metadata ? JSON.parse(row.metadata) : null,
+    metadata: row.metadata
+      ? (typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata)
+      : null,
   };
 }
 

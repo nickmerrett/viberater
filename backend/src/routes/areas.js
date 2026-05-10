@@ -1,5 +1,5 @@
 import express from 'express';
-import { query } from '../config/database.js';
+import { db, generateUUID } from '../config/database.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -13,75 +13,70 @@ export const DEFAULT_AREAS = [
 ];
 
 export async function bootstrapAreas(userId) {
-  for (const area of DEFAULT_AREAS) {
-    await query(
-      `INSERT INTO areas (user_id, name, color, sort_order) VALUES ($1, $2, $3, $4)`,
-      [userId, area.name, area.color, area.sort_order]
-    );
-  }
+  await db('areas').insert(
+    DEFAULT_AREAS.map(a => ({ id: generateUUID(), user_id: userId, ...a }))
+  );
 }
 
-// List areas
 router.get('/', async (req, res) => {
   try {
-    const result = await query(
-      `SELECT * FROM areas WHERE user_id = $1 ORDER BY sort_order ASC, created_at ASC`,
-      [req.user.userId]
-    );
-    res.json({ areas: result.rows });
+    const areas = await db('areas')
+      .where({ user_id: req.user.userId })
+      .orderBy([{ column: 'sort_order' }, { column: 'created_at' }]);
+    res.json({ areas });
   } catch (error) {
     console.error('Get areas error:', error);
     res.status(500).json({ error: 'Failed to fetch areas' });
   }
 });
 
-// Create area
 router.post('/', async (req, res) => {
   try {
     const { name, color = '#6366f1' } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
 
-    const count = await query(`SELECT COUNT(*) FROM areas WHERE user_id = $1`, [req.user.userId]);
-    const sort_order = parseInt(count.rows[0].count);
+    const [{ count }] = await db('areas').where({ user_id: req.user.userId }).count('* as count');
 
-    const result = await query(
-      `INSERT INTO areas (user_id, name, color, sort_order) VALUES ($1, $2, $3, $4) RETURNING *`,
-      [req.user.userId, name.trim(), color, sort_order]
-    );
-    res.status(201).json({ area: result.rows[0] });
+    const [area] = await db('areas').insert({
+      id: generateUUID(),
+      user_id: req.user.userId,
+      name: name.trim(),
+      color,
+      sort_order: parseInt(count),
+    }).returning('*');
+
+    res.status(201).json({ area });
   } catch (error) {
     console.error('Create area error:', error);
     res.status(500).json({ error: 'Failed to create area' });
   }
 });
 
-// Update area
 router.put('/:id', async (req, res) => {
   try {
-    const { name, color } = req.body;
-    const result = await query(
-      `UPDATE areas SET
-        name = COALESCE($1, name),
-        color = COALESCE($2, color)
-       WHERE id = $3 AND user_id = $4 RETURNING *`,
-      [name, color, req.params.id, req.user.userId]
-    );
-    if (!result.rows.length) return res.status(404).json({ error: 'Area not found' });
-    res.json({ area: result.rows[0] });
+    const { name, color, sort_order } = req.body;
+    const updates = {};
+    if (name  !== undefined) updates.name       = name.trim();
+    if (color !== undefined) updates.color      = color;
+    if (sort_order !== undefined) updates.sort_order = sort_order;
+
+    const [area] = await db('areas')
+      .where({ id: req.params.id, user_id: req.user.userId })
+      .update(updates)
+      .returning('*');
+
+    if (!area) return res.status(404).json({ error: 'Area not found' });
+    res.json({ area });
   } catch (error) {
     console.error('Update area error:', error);
     res.status(500).json({ error: 'Failed to update area' });
   }
 });
 
-// Delete area (nullifies area_id on content)
 router.delete('/:id', async (req, res) => {
   try {
-    const result = await query(
-      `DELETE FROM areas WHERE id = $1 AND user_id = $2 RETURNING id`,
-      [req.params.id, req.user.userId]
-    );
-    if (!result.rows.length) return res.status(404).json({ error: 'Area not found' });
+    const deleted = await db('areas').where({ id: req.params.id, user_id: req.user.userId }).del();
+    if (!deleted) return res.status(404).json({ error: 'Area not found' });
     res.json({ success: true });
   } catch (error) {
     console.error('Delete area error:', error);

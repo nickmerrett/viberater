@@ -20,7 +20,7 @@ import areasRoutes, { bootstrapAreas } from './routes/areas.js';
 import attachmentsRoutes from './routes/attachments.js';
 import shareRoutes from './routes/share.js';
 import researchRoutes from './routes/research.js';
-import { query } from './config/database.js';
+import { db } from './config/database.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -124,8 +124,8 @@ await fs.ensureDir('./logs');
 // Purge expired refresh tokens daily
 async function purgeExpiredTokens() {
   try {
-    const result = await query('DELETE FROM refresh_tokens WHERE expires_at < NOW()');
-    if (result.rowCount > 0) console.log(`[auth] Purged ${result.rowCount} expired refresh tokens`);
+    const count = await db('refresh_tokens').where('expires_at', '<', new Date()).del();
+    if (count > 0) console.log(`[auth] Purged ${count} expired refresh tokens`);
   } catch (e) {
     if (!e.message?.includes('no such table')) {
       console.error('[auth] Token purge failed:', e.message);

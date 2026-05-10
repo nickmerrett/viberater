@@ -1,317 +1,87 @@
-import pg from 'pg';
-import Database from 'better-sqlite3';
+import knex from 'knex';
 import { v4 as uuidv4 } from 'uuid';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs-extra';
 
-const { Pool } = pg;
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Database type from environment variable (default: sqlite)
-const DB_TYPE = process.env.DB_TYPE || 'sqlite';
+export const DB_TYPE = process.env.DB_TYPE || 'sqlite';
 
-let db = null;
-let pool = null;
+const ARRAY_COLS = ['tags', 'vibe', 'tech_stack', 'links', 'related_ideas'];
+const JSON_COLS  = ['conversation', 'settings', 'messages', 'project_plan'];
+const BOOL_COLS  = ['archived', 'ai_generated', 'git_committed', 'completed', 'sharing_enabled', 'is_author_reply'];
+const DATETIME_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 
-// Initialize database based on type
-if (DB_TYPE === 'postgres') {
-  console.log('🗄️  Using PostgreSQL database');
-
-  pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
-  pool.on('connect', () => {
-    console.log('✓ Connected to PostgreSQL database');
-  });
-
-  pool.on('error', (err) => {
-    console.error('PostgreSQL pool error:', err);
-  });
-} else {
-  console.log('🗄️  Using SQLite database');
-
-  // Create database directory if it doesn't exist
-  const dbDir = process.env.SQLITE_DIR || join(__dirname, '../../storage');
-  const dbPath = join(dbDir, 'viberater.db');
-
-  fs.ensureDirSync(dbDir);
-
-  db = new Database(dbPath);
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
-
-  console.log(`✓ Connected to SQLite database: ${dbPath}`);
-}
-
-/**
- * Generate UUID for SQLite inserts
- */
-export function generateUUID() {
-  return uuidv4();
-}
-
-/**
- * Parse SQLite row - convert JSON strings back to arrays/objects
- */
 function parseRow(row) {
-  if (!row) return row;
-
-  const parsed = { ...row };
-
-  // Known array columns
-  const arrayColumns = ['tags', 'vibe', 'tech_stack', 'links', 'related_ideas'];
-  // Known JSON/object columns
-  const jsonColumns = ['conversation', 'settings', 'messages', 'project_plan'];
-
-  for (const [key, value] of Object.entries(parsed)) {
-    if (value === null || value === undefined) continue;
-
-    // Parse array columns
-    if (arrayColumns.includes(key) && typeof value === 'string') {
-      try {
-        parsed[key] = JSON.parse(value);
-        // Ensure it's an array
-        if (!Array.isArray(parsed[key])) {
-          parsed[key] = [];
-        }
-      } catch (e) {
-        // If parse fails, return empty array
-        parsed[key] = [];
-      }
-    }
-
-    // Parse JSON columns
-    if (jsonColumns.includes(key) && typeof value === 'string') {
-      try {
-        parsed[key] = JSON.parse(value);
-      } catch (e) {
-        // Keep as string if parse fails
-      }
-    }
-
-    // Convert integer booleans back to boolean (SQLite stores as 0/1)
-    if (key === 'archived' || key === 'ai_generated' || key === 'git_committed') {
-      parsed[key] = Boolean(value);
-    }
-
-    // Normalize SQLite datetime strings ("YYYY-MM-DD HH:MM:SS", no timezone) to
-    // ISO 8601 UTC ("YYYY-MM-DDTHH:MM:SSZ") so browsers don't misinterpret them
-    // as local time, which breaks chronological sorting when mixed with client
-    // timestamps from new Date().toISOString().
-    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
-      parsed[key] = value.replace(' ', 'T') + 'Z';
+  if (!row || typeof row !== 'object') return row;
+  const out = { ...row };
+  for (const [k, v] of Object.entries(out)) {
+    if (v === null || v === undefined) continue;
+    if (ARRAY_COLS.includes(k) && typeof v === 'string') {
+      try { out[k] = JSON.parse(v); if (!Array.isArray(out[k])) out[k] = []; }
+      catch { out[k] = []; }
+    } else if (JSON_COLS.includes(k) && typeof v === 'string') {
+      try { out[k] = JSON.parse(v); } catch {}
+    } else if (BOOL_COLS.includes(k)) {
+      out[k] = Boolean(v);
+    } else if (typeof v === 'string' && DATETIME_RE.test(v)) {
+      out[k] = v.replace(' ', 'T') + 'Z';
     }
   }
-
-  return parsed;
+  return out;
 }
 
-/**
- * Unified query interface for both PostgreSQL and SQLite
- * @param {string} text - SQL query
- * @param {Array} params - Query parameters
- * @returns {Promise<Object>} Query result
- */
-export async function query(text, params = []) {
+function makeConfig() {
   if (DB_TYPE === 'postgres') {
-    return pool.query(text, params);
-  } else {
-    // SQLite synchronous API wrapped in Promise
-    return new Promise((resolve, reject) => {
-      try {
-        // Convert PostgreSQL-style $1, $2 to SQLite-style ?
-        let sqliteQuery = text;
-        let sqliteParams = [...params];
-
-        if (params && params.length > 0) {
-          sqliteQuery = text.replace(/\$(\d+)/g, '?');
-        }
-
-        // Convert PostgreSQL functions to SQLite equivalents
-        sqliteQuery = sqliteQuery.replace(/\bNOW\(\)/gi, 'CURRENT_TIMESTAMP');
-
-        // Convert Date objects to ISO strings for SQLite
-        sqliteParams = sqliteParams.map(param => {
-          if (param instanceof Date) {
-            return param.toISOString();
-          }
-          return param;
-        });
-
-        // For INSERT statements, check if we need to inject a UUID for id column
-        const isInsert = sqliteQuery.trim().toUpperCase().startsWith('INSERT');
-        if (isInsert) {
-          // Check if the INSERT is missing an id column value
-          const insertMatch = sqliteQuery.match(/INSERT\s+INTO\s+(\w+)\s*\(([^)]+)\)/i);
-          if (insertMatch) {
-            const tableName = insertMatch[1];
-            const columns = insertMatch[2].split(',').map(c => c.trim());
-
-            // Skip migrations table and other tables that use INTEGER autoincrement
-            const skipTables = ['migrations'];
-
-            // If 'id' column is not in the list and table needs UUIDs, add it
-            if (!columns.includes('id') && !skipTables.includes(tableName)) {
-              const uuid = generateUUID();
-
-              // Add id column
-              columns.unshift('id');
-
-              // Add UUID to params at the beginning
-              sqliteParams.unshift(uuid);
-
-              // Rebuild query with id column — preserve original values so
-              // literals like 'user', 'image', true stay as-is and aren't
-              // replaced with extra ? placeholders.
-              const valuesMatch = sqliteQuery.match(/VALUES\s*\(([^)]+)\)/i);
-              if (valuesMatch) {
-                const newColumns = columns.join(', ');
-                const originalValues = valuesMatch[1];
-                sqliteQuery = sqliteQuery.replace(
-                  /INSERT\s+INTO\s+\w+\s*\([^)]+\)\s*VALUES\s*\([^)]+\)/i,
-                  `INSERT INTO ${tableName} (${newColumns}) VALUES (?, ${originalValues})`
-                );
-              }
-            }
-          }
-        }
-
-        // Determine if this is a SELECT query or a mutation
-        const isSelect = sqliteQuery.trim().toUpperCase().startsWith('SELECT');
-        const isReturning = sqliteQuery.toUpperCase().includes('RETURNING');
-
-        if (isSelect) {
-          const rows = db.prepare(sqliteQuery).all(...sqliteParams);
-          // Parse JSON strings back to arrays/objects for SQLite results
-          const parsedRows = rows.map(row => parseRow(row));
-          resolve({ rows: parsedRows, rowCount: parsedRows.length });
-        } else if (isReturning) {
-          // Handle INSERT/UPDATE/DELETE with RETURNING clause
-          // SQLite doesn't support RETURNING, so we need to handle this differently
-
-          // Remove RETURNING clause and get the columns
-          const returningMatch = sqliteQuery.match(/RETURNING\s+(.+?)(?:;|$)/i);
-          const rawReturning = returningMatch ? returningMatch[1].trim() : '*';
-
-          // Whitelist column names — only allow word chars, underscores, and *
-          // Prevents any SQL injection if this adapter is ever called with dynamic SQL
-          const safeColumns = rawReturning === '*'
-            ? '*'
-            : rawReturning.split(',')
-                .map(c => c.trim())
-                .filter(c => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(c))
-                .join(', ') || '*';
-
-          const queryWithoutReturning = sqliteQuery.replace(/RETURNING\s+.+?(?:;|$)/i, '');
-
-          const isUpdate = queryWithoutReturning.trim().toUpperCase().startsWith('UPDATE');
-
-          // Whitelist table name from INSERT or UPDATE
-          const rawTable = (
-            queryWithoutReturning.match(/INSERT\s+INTO\s+(\w+)/i)?.[1] ??
-            queryWithoutReturning.match(/UPDATE\s+(\w+)/i)?.[1] ??
-            ''
-          );
-          const tableName = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(rawTable) ? rawTable : null;
-
-          const info = db.prepare(queryWithoutReturning).run(...sqliteParams);
-
-          let rows = [];
-
-          if (isInsert && tableName && (info.lastInsertRowid || sqliteParams[0])) {
-            // INSERT: fetch by UUID (injected as first param) or rowid
-            if (sqliteParams[0]) {
-              rows = db.prepare(`SELECT ${safeColumns} FROM ${tableName} WHERE id = ?`).all(sqliteParams[0]);
-            } else if (info.lastInsertRowid) {
-              rows = db.prepare(`SELECT ${safeColumns} FROM ${tableName} WHERE rowid = ?`).all(info.lastInsertRowid);
-            }
-            rows = rows.map(row => parseRow(row));
-          } else if (isUpdate && tableName && info.changes > 0) {
-            // UPDATE: re-run the WHERE clause as a SELECT to simulate RETURNING
-            const whereMatch = queryWithoutReturning.match(/WHERE\s+([\s\S]+)$/i);
-            if (whereMatch) {
-              // Count ? in the SET clause to find where WHERE params begin
-              const setMatch = queryWithoutReturning.match(/SET\s+([\s\S]+?)\s+WHERE/i);
-              const setParamCount = (setMatch?.[1].match(/\?/g) || []).length;
-              const whereParams = sqliteParams.slice(setParamCount);
-              rows = db.prepare(`SELECT ${safeColumns} FROM ${tableName} WHERE ${whereMatch[1]}`).all(...whereParams);
-              rows = rows.map(row => parseRow(row));
-            }
-          }
-
-          resolve({ rows, rowCount: info.changes });
-        } else {
-          // Regular INSERT/UPDATE/DELETE without RETURNING
-          const info = db.prepare(sqliteQuery).run(...sqliteParams);
-          resolve({ rows: [], rowCount: info.changes });
-        }
-      } catch (error) {
-        reject(error);
-      }
-    });
-  }
-}
-
-/**
- * Get a database client (for transactions)
- * For SQLite, this returns a transaction wrapper
- */
-export async function getClient() {
-  if (DB_TYPE === 'postgres') {
-    return pool.connect();
-  } else {
-    // Return a SQLite transaction wrapper
+    console.log('🗄️  Using PostgreSQL database');
     return {
-      query: query,
-      release: () => {},
-      query: async (text, params) => query(text, params)
+      client: 'pg',
+      connection: process.env.DATABASE_URL,
+      pool: { min: 2, max: 10 },
     };
   }
+
+  console.log('🗄️  Using SQLite database');
+  const dir  = process.env.SQLITE_DIR || join(__dirname, '../../storage');
+  const file = process.env.SQLITE_PATH || join(dir, 'viberater.db');
+  fs.ensureDirSync(dir);
+  console.log(`✓ SQLite path: ${file}`);
+  return {
+    client: 'better-sqlite3',
+    connection: { filename: file },
+    useNullAsDefault: true,
+    pool: { min: 1, max: 1 },  // better-sqlite3 is synchronous
+  };
 }
 
-/**
- * Execute raw SQL (for migrations)
- * @param {string} sql - Raw SQL to execute
- */
+export const db = knex({
+  ...makeConfig(),
+  postProcessResponse(result) {
+    if (Array.isArray(result)) return result.map(parseRow);
+    if (result && typeof result === 'object' && !('rowCount' in result)) return parseRow(result);
+    return result;
+  },
+});
+
+// Verify connection on startup
+if (DB_TYPE === 'postgres') {
+  db.raw('SELECT 1').then(() => console.log('✓ Connected to PostgreSQL')).catch(console.error);
+} else {
+  db.raw('PRAGMA journal_mode = WAL').then(() => {}).catch(console.error);
+  db.raw('PRAGMA foreign_keys = ON').then(() => console.log('✓ Connected to SQLite')).catch(console.error);
+}
+
+export const generateUUID = () => uuidv4();
+
+// Run raw SQL (used by migrations)
 export async function executeSql(sql) {
-  if (DB_TYPE === 'postgres') {
-    return pool.query(sql);
-  } else {
-    return new Promise((resolve, reject) => {
-      try {
-        db.exec(sql);
-        resolve({ rowCount: 0 });
-      } catch (error) {
-        reject(error);
-      }
-    });
-  }
+  return db.raw(sql);
 }
 
-/**
- * Get database type
- */
-export function getDbType() {
+export async function getDbType() {
   return DB_TYPE;
 }
 
-/**
- * Close database connection
- */
-export async function close() {
-  if (DB_TYPE === 'postgres') {
-    await pool.end();
-  } else {
-    db.close();
-  }
-}
-
-// Export pool/db for direct access if needed
-export { pool, db };
-
-export default { query, getClient, executeSql, getDbType, close, generateUUID };
+export default db;
