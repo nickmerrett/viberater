@@ -144,18 +144,30 @@ export default function IdeaDetail({
             </h1>
           )}
           {areas.length > 0 && (
-            <select
-              value={localIdea.area_id || ''}
-              onChange={async e => {
-                const area_id = e.target.value || null;
-                await onUpdate(localIdea.id, { area_id });
-                setLocalIdea(prev => ({ ...prev, area_id }));
-              }}
-              className="text-xs text-gray-500 bg-white/5 border border-white/10 rounded-md px-1.5 py-0.5 outline-none cursor-pointer hover:border-white/20 transition-colors mt-1"
-            >
-              <option value="">No area</option>
-              {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
+            editing === 'area' ? (
+              <select
+                autoFocus
+                value={localIdea.area_id || ''}
+                onChange={async e => {
+                  const area_id = e.target.value || null;
+                  setEditing(null);
+                  await onUpdate(localIdea.id, { area_id });
+                  setLocalIdea(prev => ({ ...prev, area_id }));
+                }}
+                onBlur={() => setEditing(null)}
+                className="text-xs bg-white/10 border border-primary/40 rounded-md px-1.5 py-0.5 outline-none mt-1"
+              >
+                <option value="">No area</option>
+                {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            ) : (
+              <button
+                onClick={() => setEditing('area')}
+                className="text-xs text-gray-500 bg-white/5 border border-white/10 rounded-md px-1.5 py-0.5 mt-1 hover:border-white/20 transition-colors"
+              >
+                {areas.find(a => a.id === localIdea.area_id)?.name || 'No area'} ▾
+              </button>
+            )
           )}
         </div>
 
