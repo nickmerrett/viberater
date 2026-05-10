@@ -151,7 +151,7 @@ export default function IdeaDetail({
                 await onUpdate(localIdea.id, { area_id });
                 setLocalIdea(prev => ({ ...prev, area_id }));
               }}
-              className="text-xs text-gray-400 bg-transparent border-none outline-none cursor-pointer hover:text-white transition-colors mt-0.5"
+              className="text-xs text-gray-500 bg-white/5 border border-white/10 rounded-md px-1.5 py-0.5 outline-none cursor-pointer hover:border-white/20 transition-colors mt-1"
             >
               <option value="">No area</option>
               {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
