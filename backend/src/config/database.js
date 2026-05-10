@@ -75,6 +75,13 @@ if (DB_TYPE === 'postgres') {
 
 export const generateUUID = () => uuidv4();
 
+// Compatibility shim used by tests — wraps knex.raw() in the old {rows, rowCount} shape
+export async function query(sql, params = []) {
+  const result = await db.raw(sql, params);
+  const rows = Array.isArray(result) ? result : (result?.rows ?? []);
+  return { rows, rowCount: rows.length };
+}
+
 // Run raw SQL (used by migrations)
 // knex.raw() uses better-sqlite3's prepare() which rejects multi-statement SQL.
 // For SQLite we split on statement boundaries and run each one separately.
