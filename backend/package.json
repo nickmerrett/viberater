@@ -9,7 +9,7 @@
     "start": "NODE_ENV=production node src/server.js",
     "migrate": "node migrations/run.js",
     "migrate:pg-to-sqlite": "node scripts/migrate-postgres-to-sqlite.js",
-    "test": "NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.cjs"
+    "test": "NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.cjs --forceExit"
   },
   "keywords": [
     "viberater",
