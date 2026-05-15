@@ -85,15 +85,19 @@ export default function CaptureChat({ onNavigate }) {
   const syncingRef = useRef(false);
   const initialScrollDone = useRef(false);
   const wasOnlineRef = useRef(navigator.onLine);
+  const sessionIdRef = useRef(sessionId);
 
-  // Load all messages on mount
-  useEffect(() => { loadHistory(); }, []);
+  // Keep ref in sync so closures with empty deps always read current session
+  useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
+
+  // Load messages for current session on mount
+  useEffect(() => { loadHistory(sessionIdRef.current); }, []);
 
   // Reload messages when PWA comes back into foreground (cross-device sync)
   useEffect(() => {
     function handleVisibility() {
       if (document.visibilityState === 'visible' && navigator.onLine) {
-        loadHistory();
+        loadHistory(sessionIdRef.current);
       }
     }
     document.addEventListener('visibilitychange', handleVisibility);
@@ -117,7 +121,7 @@ export default function CaptureChat({ onNavigate }) {
     }
     if (wasOnlineRef.current) return; // already online at mount — skip
     wasOnlineRef.current = true;
-    loadHistory();
+    loadHistory(sessionIdRef.current);
     if (pendingMessages.length > 0 && !syncingRef.current) {
       flushPending();
     }
