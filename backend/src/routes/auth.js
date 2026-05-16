@@ -192,10 +192,11 @@ router.get('/me', authenticateToken, async (req, res) => {
   try {
     const user = await db('users')
       .where({ id: req.user.userId })
-      .select('id', 'email', 'name', 'created_at', 'settings', 'subscription', 'ai_provider')
+      .select('id', 'email', 'name', 'created_at', 'settings', 'subscription', 'ai_provider', 'api_key_hash')
       .first();
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json({ user });
+    const { api_key_hash, ...safeUser } = user;
+    res.json({ user: { ...safeUser, has_api_key: !!api_key_hash } });
   } catch (error) {
     console.error('Get user error:', error);
     res.status(500).json({ error: 'Failed to get user' });

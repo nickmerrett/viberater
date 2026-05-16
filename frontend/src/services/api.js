@@ -152,6 +152,14 @@ class APIClient {
     localStorage.removeItem('viberater_user');
   }
 
+  async generateApiKey() {
+    return this.request('/auth/apikey', { method: 'POST' });
+  }
+
+  async revokeApiKey() {
+    return this.request('/auth/apikey', { method: 'DELETE' });
+  }
+
   // Ideas endpoints
   async getIdeas(params = {}) {
     const query = new URLSearchParams(params).toString();

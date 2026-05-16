@@ -9,6 +9,7 @@ import ProjectsView from '../components/ProjectsView';
 import RemindersView from '../components/RemindersView';
 import AreaFilter from '../components/AreaFilter';
 import AreasSettings from '../components/AreasSettings';
+import ApiKeySettings from '../components/ApiKeySettings';
 import { useAreaStore } from '../store/useAreaStore';
 import PWAInstallPrompt from '../components/PWAInstallPrompt';
 import OfflineIndicator from '../components/OfflineIndicator';
@@ -28,6 +29,7 @@ export default function Dashboard() {
     return ['capture', 'ideas', 'projects', 'reminders'].includes(p) ? p : 'capture';
   });
   const [showAreasSettings, setShowAreasSettings] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showConsole, setShowConsole] = useState(false);
   const [batchGap, setBatchGap] = useState(() => getSetting('batchGapSeconds'));
@@ -136,6 +138,14 @@ export default function Dashboard() {
               <span>Manage Areas</span>
             </button>
 
+            <button
+              onClick={() => { setShowMenu(false); setShowApiKey(true); }}
+              className="w-full text-left px-4 py-2 rounded-lg hover:bg-white/5 transition-colors flex items-center gap-2 mb-2"
+            >
+              <span>🔑</span>
+              <span>API Key</span>
+            </button>
+
             <div className="px-4 py-2 mb-2">
               <div className="text-xs text-gray-500 mb-1.5">Offline batch gap</div>
               <div className="flex items-center gap-2">
@@ -195,6 +205,7 @@ export default function Dashboard() {
       </nav>
 
       {showAreasSettings && <AreasSettings onClose={() => setShowAreasSettings(false)} />}
+      {showApiKey && <ApiKeySettings hasApiKey={!!user?.has_api_key} onClose={() => setShowApiKey(false)} />}
 
       {/* Area Filter */}
       <AreaFilter />
