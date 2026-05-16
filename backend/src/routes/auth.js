@@ -163,6 +163,30 @@ router.post('/logout', async (req, res) => {
   }
 });
 
+// Generate API key — returns plaintext key once, stores only the hash
+router.post('/apikey', authenticateToken, async (req, res) => {
+  try {
+    const key = 'vbr_' + crypto.randomBytes(32).toString('hex');
+    const hash = crypto.createHash('sha256').update(key).digest('hex');
+    await db('users').where({ id: req.user.userId }).update({ api_key_hash: hash });
+    res.json({ apiKey: key });
+  } catch (error) {
+    console.error('Generate API key error:', error);
+    res.status(500).json({ error: 'Failed to generate API key' });
+  }
+});
+
+// Revoke API key
+router.delete('/apikey', authenticateToken, async (req, res) => {
+  try {
+    await db('users').where({ id: req.user.userId }).update({ api_key_hash: null });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Revoke API key error:', error);
+    res.status(500).json({ error: 'Failed to revoke API key' });
+  }
+});
+
 // Get current user
 router.get('/me', authenticateToken, async (req, res) => {
   try {

@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import { db } from '../config/database.js';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -7,7 +8,11 @@ if (!JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is required');
 }
 
-export function authenticateToken(req, res, next) {
+function hashApiKey(key) {
+  return crypto.createHash('sha256').update(key).digest('hex');
+}
+
+export async function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
@@ -15,6 +20,22 @@ export function authenticateToken(req, res, next) {
     return res.status(401).json({ error: 'Access token required' });
   }
 
+  // API key path: vbr_ prefix
+  if (token.startsWith('vbr_')) {
+    try {
+      const user = await db('users')
+        .where({ api_key_hash: hashApiKey(token) })
+        .select('id', 'email')
+        .first();
+      if (!user) return res.status(401).json({ error: 'Invalid API key' });
+      req.user = { userId: user.id, email: user.email };
+      return next();
+    } catch (error) {
+      return res.status(500).json({ error: 'Authentication failed' });
+    }
+  }
+
+  // JWT path
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
 

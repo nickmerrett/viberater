@@ -14,40 +14,40 @@ const mockRes = () => {
 };
 
 describe('authenticateToken', () => {
-  it('returns 401 when no token provided', () => {
+  it('returns 401 when no token provided', async () => {
     const req = { headers: {} };
     const res = mockRes();
     const next = jest.fn();
-    authenticateToken(req, res, next);
+    await authenticateToken(req, res, next);
     expect(res.status).toHaveBeenCalledWith(401);
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('returns 403 for an invalid token', () => {
+  it('returns 403 for an invalid token', async () => {
     const req = { headers: { authorization: 'Bearer not-a-real-token' } };
     const res = mockRes();
     const next = jest.fn();
-    authenticateToken(req, res, next);
+    await authenticateToken(req, res, next);
     expect(res.status).toHaveBeenCalledWith(403);
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('returns 401 when a refresh token is used as an access token', () => {
+  it('returns 401 when a refresh token is used as an access token', async () => {
     const token = generateRefreshToken('user-id', null);
     const req = { headers: { authorization: `Bearer ${token}` } };
     const res = mockRes();
     const next = jest.fn();
-    authenticateToken(req, res, next);
+    await authenticateToken(req, res, next);
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith({ error: 'Invalid token type' });
   });
 
-  it('calls next and sets req.user for a valid access token', () => {
+  it('calls next and sets req.user for a valid access token', async () => {
     const token = generateAccessToken('user-123', 'test@example.com');
     const req = { headers: { authorization: `Bearer ${token}` } };
     const res = mockRes();
     const next = jest.fn();
-    authenticateToken(req, res, next);
+    await authenticateToken(req, res, next);
     expect(next).toHaveBeenCalled();
     expect(req.user).toEqual({ userId: 'user-123', email: 'test@example.com' });
   });
