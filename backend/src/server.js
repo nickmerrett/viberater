@@ -20,6 +20,7 @@ import areasRoutes, { bootstrapAreas } from './routes/areas.js';
 import attachmentsRoutes from './routes/attachments.js';
 import shareRoutes from './routes/share.js';
 import researchRoutes from './routes/research.js';
+import mcpRoutes from './routes/mcp.js';
 import { db } from './config/database.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -101,6 +102,7 @@ app.use('/api/areas', areasRoutes);
 app.use('/api/attachments', attachmentsRoutes);
 app.use('/api/share', shareRoutes);
 app.use('/api/research', researchRoutes);
+app.use('/mcp', mcpRoutes);
 
 // 404 handler
 app.use((req, res) => {
