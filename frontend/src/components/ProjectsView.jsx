@@ -13,6 +13,7 @@ export default function ProjectsView({ activeArea = null }) {
   const [showEditProject, setShowEditProject] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
   const [editingTask, setEditingTask] = useState(null);
+  const [beadsImportHint, setBeadsImportHint] = useState(false);
   const [showEditTask, setShowEditTask] = useState(false);
   const [newTask, setNewTask] = useState({
     title: '',
@@ -218,16 +219,24 @@ export default function ProjectsView({ activeArea = null }) {
               </a>
             )}
             {selectedProject.beads_epic_id && (
-              <button
-                onClick={async () => {
-                  const filename = `${selectedProject.title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-beads.jsonl`;
-                  await api.downloadBeadsExport(selectedProject.id, filename);
-                }}
-                className="text-primary/70 hover:text-primary transition-colors flex items-center gap-1 text-sm"
-                title="Download beads issues (bd import -i file.jsonl)"
-              >
-                ⬇ beads
-              </button>
+              <div className="flex flex-col gap-1">
+                <button
+                  onClick={async () => {
+                    const filename = `${selectedProject.title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-beads.jsonl`;
+                    await api.downloadBeadsExport(selectedProject.id, filename);
+                    setBeadsImportHint(filename);
+                    setTimeout(() => setBeadsImportHint(false), 15000);
+                  }}
+                  className="text-primary/70 hover:text-primary transition-colors flex items-center gap-1 text-sm"
+                >
+                  ⬇ beads
+                </button>
+                {beadsImportHint && (
+                  <code className="text-xs text-gray-400 bg-black/30 px-2 py-1 rounded">
+                    bd import --rename-on-import -i {beadsImportHint}
+                  </code>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -666,9 +675,11 @@ export default function ProjectsView({ activeArea = null }) {
                           e.stopPropagation();
                           const filename = `${project.title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-beads.jsonl`;
                           await api.downloadBeadsExport(project.id, filename);
+                          setBeadsImportHint(filename);
+                          setTimeout(() => setBeadsImportHint(false), 15000);
                         }}
                         className="text-xs text-primary/70 hover:text-primary transition-colors flex items-center gap-1"
-                        title="Download beads issues (bd import -i file.jsonl)"
+                        title={`bd import --rename-on-import -i ${project.title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-beads.jsonl`}
                       >
                         ⬇ beads
                       </button>
