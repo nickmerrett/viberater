@@ -188,7 +188,10 @@ router.get('/:id/beads-export', async (req, res) => {
     const filtered = lines.filter(line => {
       try {
         const issue = JSON.parse(line);
-        return issue.id === epicId || issue.parent === epicId;
+        return issue.id === epicId ||
+          (Array.isArray(issue.dependencies) && issue.dependencies.some(
+            d => d.depends_on_id === epicId && d.type === 'parent-child'
+          ));
       } catch { return false; }
     });
 
