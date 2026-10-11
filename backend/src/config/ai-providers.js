@@ -1,17 +1,12 @@
 export default {
-  claude: {
-    apiKey: process.env.CLAUDE_API_KEY,
-    model: 'claude-sonnet-4-5-20250929',
-    maxTokens: 200000
-  },
-  openai: {
-    apiKey: process.env.OPENAI_API_KEY,
-    model: 'gpt-4-turbo-preview',
-    maxTokens: 128000
+  openrouter: {
+    apiKey: process.env.OPENROUTER_API_KEY,
+    baseURL: 'https://openrouter.ai/api/v1',
+    model: process.env.AI_MODEL || 'meta-llama/llama-3.3-70b-instruct',
   },
   ollama: {
     baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
-    model: 'codellama'
+    model: 'codellama',
   },
-  default: process.env.DEFAULT_AI_PROVIDER || 'claude'
+  default: process.env.DEFAULT_AI_PROVIDER || 'openrouter',
 };

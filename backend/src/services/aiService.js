@@ -1,26 +1,19 @@
-import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { toFile } from 'openai/uploads';
 
 class AIService {
   constructor() {
-    this.defaultProvider = process.env.DEFAULT_AI_PROVIDER || 'claude';
+    this.defaultProvider = process.env.DEFAULT_AI_PROVIDER || 'openrouter';
 
-    // Initialize Claude
-    if (process.env.CLAUDE_API_KEY) {
-      this.anthropic = new Anthropic({
-        apiKey: process.env.CLAUDE_API_KEY,
+    // Initialize OpenRouter (OpenAI-compatible)
+    if (process.env.OPENROUTER_API_KEY) {
+      this.openrouter = new OpenAI({
+        apiKey: process.env.OPENROUTER_API_KEY,
+        baseURL: 'https://openrouter.ai/api/v1',
       });
     }
 
-    // Initialize OpenAI
-    if (process.env.OPENAI_API_KEY) {
-      this.openai = new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY,
-      });
-    }
-
-    // Ollama base URL
+    // Ollama base URL (local inference, kept as-is)
     this.ollamaBaseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
   }
 
@@ -33,79 +26,36 @@ class AIService {
     const provider = options.provider || this.defaultProvider;
 
     switch (provider) {
-      case 'claude':
-        return this.chatClaude(messages, options);
+      case 'openrouter':
       case 'openai':
-        return this.chatOpenAI(messages, options);
+      case 'claude':  // legacy — route to openrouter
+        return this.chatOpenRouter(messages, options);
       case 'ollama':
         return this.chatOllama(messages, options);
       default:
-        throw new Error(`Unknown AI provider: ${provider}`);
+        return this.chatOpenRouter(messages, options);
     }
   }
 
   // Plain text chat — no JSON parsing, used for conversational capture
   async chatRaw(messages, options = {}) {
-    const provider = options.provider || this.defaultProvider;
     const opts = { ...options, maxTokens: 512 };
-
-    switch (provider) {
-      case 'claude':
-        return this.chatClaude(messages, opts);
-      case 'openai':
-        return this.chatOpenAI(messages, opts);
-      default:
-        return this.chatClaude(messages, opts);
-    }
+    return this.chatOpenRouter(messages, opts);
   }
 
   // Streaming chat — calls onToken(text) for each chunk, returns full content
   async streamRaw(messages, options = {}, onToken) {
-    const provider = options.provider || this.defaultProvider;
-
-    switch (provider) {
-      case 'claude':
-        return this.streamClaude(messages, options, onToken);
-      case 'openai':
-        return this.streamOpenAI(messages, options, onToken);
-      default:
-        return this.streamClaude(messages, options, onToken);
-    }
+    return this.streamOpenRouter(messages, options, onToken);
   }
 
-  async streamClaude(messages, options = {}, onToken) {
-    if (!this.anthropic) throw new Error('Claude API key not configured');
+  async streamOpenRouter(messages, options = {}, onToken) {
+    if (!this.openrouter) throw new Error('OPENROUTER_API_KEY not configured');
 
     const systemPrompt = options.systemPrompt || this.getDefaultSystemPrompt();
-    const model = options.model || process.env.MODEL_PRIMARY || 'claude-sonnet-4-5';
+    const model = options.model || process.env.AI_MODEL || 'meta-llama/llama-3.3-70b-instruct';
     let fullContent = '';
 
-    const stream = this.anthropic.messages.stream({
-      model,
-      max_tokens: options.maxTokens || 512,
-      system: systemPrompt,
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
-    });
-
-    for await (const event of stream) {
-      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-        const text = event.delta.text;
-        fullContent += text;
-        onToken(text);
-      }
-    }
-
-    return { content: fullContent };
-  }
-
-  async streamOpenAI(messages, options = {}, onToken) {
-    if (!this.openai) throw new Error('OpenAI API key not configured');
-
-    const systemPrompt = options.systemPrompt || this.getDefaultSystemPrompt();
-    const model = options.model || 'gpt-4o';
-    let fullContent = '';
-
-    const stream = await this.openai.chat.completions.create({
+    const stream = await this.openrouter.chat.completions.create({
       model,
       max_tokens: options.maxTokens || 512,
       stream: true,
@@ -123,72 +73,37 @@ class AIService {
     return { content: fullContent };
   }
 
-  async chatClaude(messages, options = {}) {
-    if (!this.anthropic) {
-      throw new Error('Claude API key not configured');
+  async chatOpenRouter(messages, options = {}) {
+    if (!this.openrouter) {
+      throw new Error('OPENROUTER_API_KEY not configured');
     }
 
     const systemPrompt = options.systemPrompt || this.getDefaultSystemPrompt();
-    const model = options.model || process.env.MODEL_PRIMARY || 'claude-3-5-sonnet-20240620';
+    const model = options.model || process.env.AI_MODEL || 'meta-llama/llama-3.3-70b-instruct';
 
     try {
-      const response = await this.anthropic.messages.create({
+      const response = await this.openrouter.chat.completions.create({
         model,
         max_tokens: options.maxTokens || 1024,
         temperature: 0.7,
-        system: systemPrompt,
-        messages: messages.map(msg => ({
-          role: msg.role,
-          content: msg.content
-        }))
-      });
-
-      return {
-        content: response.content[0].text,
-        provider: 'claude',
-        model: response.model,
-        usage: {
-          inputTokens: response.usage.input_tokens,
-          outputTokens: response.usage.output_tokens
-        }
-      };
-    } catch (error) {
-      console.error('Claude API error:', error);
-      throw new Error(`Claude API error: ${error.message}`);
-    }
-  }
-
-  async chatOpenAI(messages, options = {}) {
-    if (!this.openai) {
-      throw new Error('OpenAI API key not configured');
-    }
-
-    const systemPrompt = options.systemPrompt || this.getDefaultSystemPrompt();
-    const model = options.model || 'gpt-4';
-
-    try {
-      const response = await this.openai.chat.completions.create({
-        model,
         messages: [
           { role: 'system', content: systemPrompt },
-          ...messages
+          ...messages.map(msg => ({ role: msg.role, content: msg.content })),
         ],
-        max_tokens: options.maxTokens || 1024,
-        temperature: 0.7,
       });
 
       return {
         content: response.choices[0].message.content,
-        provider: 'openai',
+        provider: 'openrouter',
         model: response.model,
         usage: {
           inputTokens: response.usage.prompt_tokens,
-          outputTokens: response.usage.completion_tokens
-        }
+          outputTokens: response.usage.completion_tokens,
+        },
       };
     } catch (error) {
-      console.error('OpenAI API error:', error);
-      throw new Error(`OpenAI API error: ${error.message}`);
+      console.error('OpenRouter API error:', error);
+      throw new Error(`OpenRouter API error: ${error.message}`);
     }
   }
 
@@ -204,10 +119,10 @@ class AIService {
           model,
           messages: [
             { role: 'system', content: systemPrompt },
-            ...messages
+            ...messages,
           ],
-          stream: false
-        })
+          stream: false,
+        }),
       });
 
       if (!response.ok) {
@@ -222,8 +137,8 @@ class AIService {
         model: data.model,
         usage: {
           inputTokens: data.prompt_eval_count || 0,
-          outputTokens: data.eval_count || 0
-        }
+          outputTokens: data.eval_count || 0,
+        },
       };
     } catch (error) {
       console.error('Ollama API error:', error);
@@ -319,47 +234,34 @@ Help me think this through!`;
   }
 
   /**
-   * Transcribe audio using OpenAI Whisper and extract idea details using Claude
+   * Transcribe audio using OpenAI Whisper and extract idea details via OpenRouter
    */
   async transcribeAudio(base64Audio, mimeType = 'audio/webm') {
     try {
       console.log('[AI Service] Transcribing audio with Whisper...');
 
+      if (!this.openrouter) {
+        throw new Error('OPENROUTER_API_KEY not configured');
+      }
+
       // Step 1: Convert base64 to buffer
       const audioBuffer = Buffer.from(base64Audio, 'base64');
 
-      // Step 2: Transcribe with Whisper (OpenAI)
-      let transcript;
-      if (this.openai) {
-        // Create a File-like object for OpenAI SDK
-        const audioFile = await toFile(audioBuffer, 'audio.webm', { type: mimeType });
+      // Step 2: Transcribe with Whisper via OpenRouter
+      const audioFile = await toFile(audioBuffer, 'audio.webm', { type: mimeType });
+      const transcriptionResponse = await this.openrouter.audio.transcriptions.create({
+        file: audioFile,
+        model: 'openai/whisper-1',
+      });
+      const transcript = transcriptionResponse.text;
+      console.log('[AI Service] Whisper transcript:', transcript);
 
-        const response = await this.openai.audio.transcriptions.create({
-          file: audioFile,
-          model: 'whisper-1'
-        });
+      // Step 3: Extract title, summary, and tags via OpenRouter
+      console.log('[AI Service] Extracting idea details...');
+      const model = process.env.AI_MODEL || 'meta-llama/llama-3.3-70b-instruct';
 
-        transcript = response.text;
-        console.log('[AI Service] Whisper transcript:', transcript);
-      } else {
-        throw new Error('OpenAI API key not configured for transcription');
-      }
-
-      // Step 3: Use Claude to extract title, summary, and tags
-      if (!this.anthropic) {
-        // Fallback: just return the transcript
-        return {
-          transcript,
-          title: transcript.substring(0, 50),
-          summary: transcript,
-          tags: []
-        };
-      }
-
-      console.log('[AI Service] Extracting idea details with Claude...');
-
-      const response = await this.anthropic.messages.create({
-        model: process.env.MODEL_PRIMARY || 'claude-3-5-sonnet-20240620',
+      const response = await this.openrouter.chat.completions.create({
+        model,
         max_tokens: 1024,
         messages: [{
           role: 'user',
@@ -374,20 +276,17 @@ Respond ONLY with valid JSON in this exact format:
   "title": "The extracted title",
   "summary": "The cleaned up summary",
   "tags": ["tag1", "tag2", "tag3"]
-}`
-        }]
+}`,
+        }],
       });
 
-      const content = response.content[0].text;
-      console.log('[AI Service] Claude response:', content);
+      const content = response.choices[0].message.content;
+      console.log('[AI Service] Extraction response:', content);
 
-      // Parse the JSON response
       let jsonText = content.trim();
       jsonText = jsonText.replace(/^```(?:json|JSON)?\s*\n?/, '').replace(/\n?\s*```$/, '').trim();
       const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        jsonText = jsonMatch[0];
-      }
+      if (jsonMatch) jsonText = jsonMatch[0];
 
       const parsed = JSON.parse(jsonText);
 
@@ -395,7 +294,7 @@ Respond ONLY with valid JSON in this exact format:
         transcript,
         title: parsed.title || transcript.substring(0, 50),
         summary: parsed.summary || transcript,
-        tags: parsed.tags || []
+        tags: parsed.tags || [],
       };
     } catch (error) {
       console.error('[AI Service] Transcription error:', error);
@@ -408,114 +307,33 @@ Respond ONLY with valid JSON in this exact format:
    */
   getAvailableProviders() {
     return {
-      claude: {
-        name: 'Claude',
-        available: !!this.anthropic,
-        configured: !!process.env.CLAUDE_API_KEY,
-        models: ['claude-3-5-sonnet-20240620', 'claude-3-opus-20240229', 'claude-3-haiku-20240307']
-      },
-      openai: {
-        name: 'OpenAI',
-        available: !!this.openai,
-        configured: !!process.env.OPENAI_API_KEY,
-        models: ['gpt-4', 'gpt-4-turbo-preview', 'gpt-3.5-turbo']
+      openrouter: {
+        name: 'OpenRouter',
+        available: !!this.openrouter,
+        configured: !!process.env.OPENROUTER_API_KEY,
+        models: [process.env.AI_MODEL || 'meta-llama/llama-3.3-70b-instruct'],
       },
       ollama: {
         name: 'Ollama',
         available: true,
         configured: true,
-        models: ['llama2', 'mistral', 'codellama']
-      }
+        models: ['llama2', 'mistral', 'codellama'],
+      },
     };
   }
 
   // ── Agentic tool loop ──────────────────────────────────────────────────
-  // Runs until the AI produces a final text response with no tool calls.
-  // onEvent(event) is called for streaming updates:
-  //   { type: 'tool_call', name, args }
-  //   { type: 'tool_result', name, result }
-  //   { type: 'token', text }
-  //   { type: 'done', content }
-
   async runWithTools(messages, tools, onEvent, options = {}) {
-    const provider = options.provider || this.defaultProvider;
     const { callTool } = await import('./toolService.js');
-
-    switch (provider) {
-      case 'claude':  return this._runWithToolsClaude(messages, tools, callTool, onEvent, options);
-      case 'openai':  return this._runWithToolsOpenAI(messages, tools, callTool, onEvent, options);
-      default:        return this._runWithToolsClaude(messages, tools, callTool, onEvent, options);
-    }
+    return this._runWithToolsOpenRouter(messages, tools, callTool, onEvent, options);
   }
 
-  async _runWithToolsClaude(messages, tools, callTool, onEvent, options) {
-    if (!this.anthropic) throw new Error('Claude API key not configured');
+  async _runWithToolsOpenRouter(messages, tools, callTool, onEvent, options) {
+    if (!this.openrouter) throw new Error('OPENROUTER_API_KEY not configured');
 
-    const model = options.model || process.env.MODEL_PRIMARY || 'claude-sonnet-4-5';
+    const model = options.model || process.env.AI_MODEL || 'meta-llama/llama-3.3-70b-instruct';
     const systemPrompt = options.systemPrompt || '';
 
-    // Translate neutral tool format → Claude format
-    const claudeTools = tools.map(t => ({
-      name: t.name,
-      description: t.description,
-      input_schema: t.parameters,
-    }));
-
-    const history = [...messages];
-
-    while (true) {
-      const response = await this.anthropic.messages.create({
-        model,
-        max_tokens: options.maxTokens || 2048,
-        system: systemPrompt,
-        tools: claudeTools,
-        messages: history,
-      });
-
-      // Collect text and tool_use blocks
-      let textContent = '';
-      const toolUses = [];
-
-      for (const block of response.content) {
-        if (block.type === 'text') {
-          textContent += block.text;
-          // Stream tokens word-by-word (non-streaming path, best effort)
-          for (const word of block.text.split(/(?<=\s)/)) {
-            onEvent({ type: 'token', text: word });
-          }
-        } else if (block.type === 'tool_use') {
-          toolUses.push(block);
-        }
-      }
-
-      // No tool calls — we're done
-      if (toolUses.length === 0 || response.stop_reason === 'end_turn') {
-        onEvent({ type: 'done', content: textContent });
-        return textContent;
-      }
-
-      // Execute each tool call
-      history.push({ role: 'assistant', content: response.content });
-
-      const toolResults = [];
-      for (const tu of toolUses) {
-        onEvent({ type: 'tool_call', name: tu.name, args: tu.input });
-        const result = await callTool(tu.name, tu.input);
-        onEvent({ type: 'tool_result', name: tu.name, result });
-        toolResults.push({ type: 'tool_result', tool_use_id: tu.id, content: result });
-      }
-
-      history.push({ role: 'user', content: toolResults });
-    }
-  }
-
-  async _runWithToolsOpenAI(messages, tools, callTool, onEvent, options) {
-    if (!this.openai) throw new Error('OpenAI API key not configured');
-
-    const model = options.model || 'gpt-4o';
-    const systemPrompt = options.systemPrompt || '';
-
-    // Translate neutral tool format → OpenAI format
     const openaiTools = tools.map(t => ({
       type: 'function',
       function: { name: t.name, description: t.description, parameters: t.parameters },
@@ -527,7 +345,7 @@ Respond ONLY with valid JSON in this exact format:
     ];
 
     while (true) {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.openrouter.chat.completions.create({
         model,
         max_tokens: options.maxTokens || 2048,
         tools: openaiTools,
