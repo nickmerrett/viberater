@@ -122,6 +122,54 @@ DEFAULT_AI_PROVIDER=claude
 MODEL_PRIMARY=claude-sonnet-4-5-20250929
 ```
 
+## 🤖 MCP Server
+
+viberater exposes a [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server, letting AI assistants (Claude, Cursor, etc.) read and manage your ideas directly.
+
+**Endpoint:** `POST /mcp`
+
+**Authentication:** `Authorization: Bearer <token>` — accepts either a JWT session token or a `vbr_` API key (generate one in Settings).
+
+### Connecting with Bob / Claude Desktop
+
+Add this to your MCP config:
+
+```json
+{
+  "mcpServers": {
+    "viberater": {
+      "type": "http",
+      "url": "http://localhost:8080/mcp",
+      "headers": {
+        "Authorization": "Bearer vbr_your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+### Available Tools
+
+| Tool | Description |
+|---|---|
+| `list_areas` | List all areas (project categories) |
+| `list_ideas` | List ideas — optional filters: `status`, `area_id`, `limit` |
+| `get_idea` | Fetch a single idea by UUID |
+| `create_idea` | Create a new idea with optional `summary`, `tags`, `area_id`, `excitement`, `complexity`, `notes` |
+| `update_idea` | Update any field on an existing idea |
+| `delete_idea` | Permanently delete an idea |
+| `get_review_queue` | Ideas untouched for 14+ days and due for weekly review |
+| `triage_idea` | Triage a review item: `keep`, `snooze` (2 weeks), `archive`, or `promote` to project |
+| `capture` | Send a rough thought — AI shapes and saves it as an idea |
+
+### Example prompts
+
+```
+"Show me all my ideas in the 'mobile' area"
+"Capture this: I want to build a CLI tool that summarises git history with AI"
+"Triage my review queue — snooze anything low-excitement"
+```
+
 ## 📱 PWA Installation
 
 **Desktop (Chrome / Edge)** — click the install icon in the address bar
