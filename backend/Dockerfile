@@ -1,13 +1,19 @@
-FROM node:20-alpine
+FROM node:20-bookworm-slim
 
 WORKDIR /app
 
+# Install build tools for native modules (bcrypt, better-sqlite3) and git
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    ca-certificates \
+    curl \
+    git \
+ && rm -rf /var/lib/apt/lists/*
+
 # Copy package files
 COPY package*.json ./
-
-# Install build tools for native modules
-# libc6-compat provides glibc shims needed to run glibc-linked binaries on Alpine
-RUN apk add --no-cache python3 make g++ libc6-compat
 
 # Install dependencies
 RUN npm install
