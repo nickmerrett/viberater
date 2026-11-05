@@ -1,0 +1,11 @@
+# Keep host/CI artifacts out of the build context (same rationale as backend).
+node_modules
+dist
+coverage
+npm-debug.log*
+.env
+.env.*
+.git
+.gitignore
+Dockerfile
+.dockerignore

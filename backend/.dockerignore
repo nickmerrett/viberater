@@ -1,0 +1,16 @@
+# Keep the host/CI node_modules out of the image.
+# The Tekton test-backend step runs `npm install` under node:20-alpine in the
+# shared workspace; without this file the Dockerfile's `COPY . .` copies those
+# musl-linked native modules over the glibc ones built inside the image, and
+# bcrypt/better-sqlite3 fail at runtime with libc.musl-x86_64.so.1 not found.
+node_modules
+npm-debug.log*
+.env
+.env.*
+storage
+logs
+coverage
+.git
+.gitignore
+Dockerfile
+.dockerignore
