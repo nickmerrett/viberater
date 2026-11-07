@@ -10,6 +10,8 @@ spec:
   description: |
     CI/CD pipeline for Viberater platform.
     Flow: clone → unit tests (parallel, fail-fast) → builds (parallel) → smoke → deploy.
+    Tests build the Dockerfile `test` stage (`--target test`, SKIP_PUSH), so the
+    test environment is the same image definition as the runtime.
     Images are tagged with the git commit SHA for traceability and to guarantee
     Kubernetes detects the new image on every deploy.
   params:
@@ -54,66 +56,62 @@ spec:
         - name: basic-auth
           workspace: basic-auth
 
-    # ── 2a. Backend unit tests (source, fail-fast before build) ───────────────
+    # ── 2a. Backend unit tests — build the Dockerfile `test` stage ───────────
+    # Builds backend/Dockerfile --target test. The stage runs `npm test` at
+    # build time, so a failing suite fails the build. SKIP_PUSH: no image is
+    # published (the tag below is never pushed).
     - name: test-backend
       runAfter:
         - fetch-repository
+      taskRef:
+        kind: Task
+        name: buildah
+      params:
+        - name: IMAGE
+          value: viberater-backend-test:$(tasks.fetch-repository.results.commit)
+        - name: DOCKERFILE
+          value: viberater/backend/Dockerfile
+        - name: CONTEXT
+          value: viberater/backend
+        - name: TLSVERIFY
+          value: 'false'
+        - name: STORAGE_DRIVER
+          value: vfs
+        - name: SKIP_PUSH
+          value: 'true'
+        - name: BUILD_EXTRA_ARGS
+          value: --target test
       workspaces:
         - name: source
           workspace: workspace
-      taskSpec:
-        workspaces:
-          - name: source
-        steps:
-          - name: install-and-test
-            image: node:20-alpine
-            securityContext:
-              runAsUser: 0
-            workingDir: $(workspaces.source.path)/viberater/backend
-            env:
-              - name: NODE_ENV
-                value: test
-              - name: JWT_SECRET
-                value: test-secret-key-for-ci-min-32-chars!!
-              - name: DB_TYPE
-                value: sqlite
-              - name: SQLITE_DIR
-                value: /tmp
-            script: |
-              #!/bin/sh
-              set -e
-              echo "=== Installing build tools for native modules ==="
-              apk add --no-cache --quiet python3 make g++
-              echo "=== Installing dependencies ==="
-              npm install
-              echo "=== Running backend tests ==="
-              npm test
-              echo "=== Backend tests passed ==="
 
-    # ── 2b. Frontend unit tests (source, fail-fast before build) ─────────────
+    # ── 2b. Frontend unit tests — build the Dockerfile `test` stage ──────────
+    # Builds frontend/Dockerfile --target test (vitest run). SKIP_PUSH: no image
+    # is published.
     - name: test-frontend
       runAfter:
         - fetch-repository
+      taskRef:
+        kind: Task
+        name: buildah
+      params:
+        - name: IMAGE
+          value: viberater-frontend-test:$(tasks.fetch-repository.results.commit)
+        - name: DOCKERFILE
+          value: viberater/frontend/Dockerfile
+        - name: CONTEXT
+          value: viberater/frontend
+        - name: TLSVERIFY
+          value: 'false'
+        - name: STORAGE_DRIVER
+          value: vfs
+        - name: SKIP_PUSH
+          value: 'true'
+        - name: BUILD_EXTRA_ARGS
+          value: --target test
       workspaces:
         - name: source
           workspace: workspace
-      taskSpec:
-        workspaces:
-          - name: source
-        steps:
-          - name: install-and-test
-            image: node:20-alpine
-            securityContext:
-              runAsUser: 0
-            workingDir: $(workspaces.source.path)/viberater/frontend
-            script: |
-              #!/bin/sh
-              set -e
-              echo "=== Installing dependencies ==="
-              npm install
-              echo "=== Running frontend tests ==="
-              npm test -- --run
-              echo "=== Frontend tests passed ==="
 
     # ── 3a. Build backend image — tagged with git commit SHA ──────────────────
     - name: build-backend
