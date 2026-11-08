@@ -31,9 +31,8 @@ spec:
           terminationMessagePath: /dev/termination-log
           name: run-migrations
           command:
-            - npm
-            - run
-            - migrate
+            - node
+            - migrations/run.js
           env:
             - name: DB_TYPE
               value: sqlite
